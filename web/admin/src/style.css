@@ -1,0 +1,78 @@
+:root {
+  --bg: #f4f4f6; --card: #fff; --ink: #1b1c22; --muted: #686a75; --line: #e1e2e8; --side: #fafafc;
+  --accent: #4b47c9; --accent-soft: #e9e8fb; --bad: #b8402b; --bad-soft: #fbe8e3; --good: #23784f; --good-soft: #e0f2e8;
+  --warn: #9a6400; --warn-soft: #fbf0d9;
+  /* Names the overview and studio screens use for the same roles */
+  --like: var(--bad); --like-soft: var(--bad-soft); --me: var(--accent); --me-soft: var(--accent-soft);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131419; --card: #1c1d24; --ink: #e9e9ef; --muted: #9a9ba8; --line: #2c2e38; --side: #17181e;
+    --accent: #9d9af5; --accent-soft: #26254a; --bad: #ef7d64; --bad-soft: #3b211b; --good: #5fcf98; --good-soft: #17301f;
+    --warn: #e7b04f; --warn-soft: #382b12;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
+a.link { color: var(--accent); }
+button { font: inherit; padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+button.good:hover:not(:disabled) { border-color: var(--good); color: var(--good); background: var(--good-soft); }
+button.plain { border: 0; padding: 0; background: none; }
+input, select, textarea { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; }
+code { font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 0 6px; border-radius: 4px; overflow-wrap: anywhere; }
+
+main { padding: 20px 24px 40px; min-width: 0; display: flex; flex-direction: column; gap: 16px; max-width: 1240px; width: 100%; }
+@media (max-width: 760px) { main { padding: 16px; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.card.flush { padding: 0; overflow: hidden; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.grid { display: grid; gap: 16px; }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+.card.flush h2 { padding: 14px 16px 0; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.page-head h1 { font-size: 20px; margin: 0; }
+.muted, .empty { color: var(--muted); font-size: 13px; }
+.error { color: var(--bad); font-size: 13px; margin: 0; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.good { background: var(--good-soft); color: var(--good); }
+.chip.plain { background: var(--line); color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Lists as rows of one card, a hairline between them */
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows > li { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.rows > li:first-child { border-top: 0; }
+.card.flush h2 + .rows > li:first-child { border-top: 1px solid var(--line); margin-top: 10px; }
+
+/* Tables that scroll sideways on their own when narrow, never the page */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 99px; padding: 2px; background: var(--card); }
+.segmented button { border: 0; border-radius: 99px; padding: 3px 12px; font-size: 13px; color: var(--muted); background: none; }
+.segmented button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.skeleton { display: block; height: 12px; border-radius: 6px; background: var(--line); animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes shimmer { 50% { opacity: .5; } }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.content-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }

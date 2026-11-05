@@ -1,4 +1,5 @@
 using FeedFabric.Application.Services;
+using FeedFabric.Application.Services.Safety;
 
 namespace FeedFabric.Application.Services.Comments;
 
@@ -17,4 +18,7 @@ public class CommentEntity : EntityBase
 
     // Soft delete: a deleted comment with replies stays as a placeholder so the thread under it still reads
     public DateTime? DeletedAt { get; set; }
+
+    // Held for review, or removed by a reviewer: see ContentStatus
+    public ContentStatus Status { get; set; }
 }

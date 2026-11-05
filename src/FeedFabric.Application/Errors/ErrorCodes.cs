@@ -17,6 +17,7 @@ public static class ErrorCodes
 
     // Users and posts
     public const string UserNotSynced = "user.not_synced";
+    public const string UserSuspended = "user.suspended";
     public const string PostNotFound = "post.not_found";
     public const string PostNotAuthor = "post.not_author";
     public const string PostEditWindowClosed = "post.edit_window_closed";

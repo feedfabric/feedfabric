@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Posts;
+using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Users;
 using Npgsql;
 
@@ -67,7 +68,7 @@ public class RepostService(AppDbContext db, TimeProvider timeProvider) : IRepost
         return RepostResultStatus.Ok;
     }
 
-    // The live original behind postId, whether postId is the original or a repost of it
+    // The live, visible original behind postId, whether postId is the original or a repost of it
     private async Task<(RepostResultStatus Status, Guid UserId, Guid OriginalId)> FindAsync(string externalUserId, Guid postId, CancellationToken cancellationToken)
     {
         var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
@@ -79,7 +80,7 @@ public class RepostService(AppDbContext db, TimeProvider timeProvider) : IRepost
         var originalId = await db.Posts
             .Where(p => p.Id == postId)
             .Select(p => p.RepostOfId ?? p.Id)
-            .Where(id => db.Posts.Any(o => o.Id == id && o.DeletedAt == null))
+            .Where(id => db.Posts.Any(o => o.Id == id && o.DeletedAt == null && o.Status == ContentStatus.Visible))
             .Select(id => (Guid?)id)
             .SingleOrDefaultAsync(cancellationToken);
         return originalId is null

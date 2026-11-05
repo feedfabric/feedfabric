@@ -14,3 +14,11 @@ dependencies = [
     "scikit-learn>=1.6",
     "boto3>=1.38",
 ]
+
+[dependency-groups]
+# Fine-tuning the toxicity model (tune_toxicity.py): uv run --group tune tune_toxicity.py
+tune = [
+    "torch>=2.9",
+    "transformers>=4.57",
+    "pyarrow>=21",
+]

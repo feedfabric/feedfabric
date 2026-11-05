@@ -14,10 +14,14 @@ public class CommentResponse
 
     public required string AuthorUsername { get; set; }
 
-    // Null when the comment is deleted
+    // Null when the comment is deleted or removed
     public string? Content { get; set; }
 
+    // Deleted by its author, or removed by a reviewer
     public bool IsDeleted { get; set; }
+
+    // Held for review: only its author is shown it
+    public bool IsHeld { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

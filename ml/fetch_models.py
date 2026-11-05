@@ -6,8 +6,8 @@
 Both are pinned to a revision, so a build always gets the same model:
   models/safety/nsfw/       nudity classifier (ViT, 224x224): onnx-community/nsfw_image_detection-ONNX, an ONNX
                             export of Falconsai/nsfw_image_detection (Apache 2.0); the 8-bit quantised file, for CPUs
-  models/safety/toxicity/   offensive-language classifier (BERT, 6 labels): unitary/toxic-bert (Apache 2.0),
-                            ONNX export by Xenova; the 8-bit file
+  models/safety/toxicity/   offensive-language classifier (RoBERTa, 16 labels): unitary/unbiased-toxic-roberta, Detoxify's
+                            "unbiased" model (Apache 2.0), ONNX export by onnx-community; the 8-bit file
   models/embeddings/minilm/ sentence embeddings (384 dimensions): sentence-transformers/all-MiniLM-L6-v2 (Apache 2.0)
 Each folder gets a meta.json with what the app needs to use it (input size, normalisation, labels, vocabulary).
 """
@@ -36,20 +36,24 @@ MODELS = [
         },
     },
     {
+        # Detoxify's "unbiased" model: trained on the Jigsaw Unintended Bias (Civil Comments) and Toxic Comment data,
+        # so mentioning who someone is ("as a gay man...") isn't scored as an attack the way toxic-bert scores it
         "prefix": "models/safety/toxicity",
-        "parts": [
-            # The model: Xenova's ONNX export of unitary/toxic-bert (Apache 2.0), 8-bit for CPUs
-            {"repo": "Xenova/toxic-bert", "revision": "65cbc2607cb7fad64f98d1e8a5a3d1f8577895fd", "files": {"model.onnx": "onnx/model_quantized.onnx"}},
-            # Its vocabulary, from the original
-            {"repo": "unitary/toxic-bert", "revision": "4d6c22e74ba2fdd26bc4f7238f50766b045a0d94", "files": {"vocab.txt": "vocab.txt"}},
-        ],
+        "repo": "onnx-community/unbiased-toxic-roberta-ONNX",
+        "revision": "d1d71b6aa711966a0dba4027b4fcd41c878c8cd5",
+        "files": {"model.onnx": "onnx/model_quantized.onnx", "vocab.json": "vocab.json", "merges.txt": "merges.txt"},
         "meta": {
             "kind": "text-classifier",
+            "tokenizer": "roberta-bpe",
             "multiLabel": True,
             "maxTokens": 256,
-            "lowercase": True,
-            "labels": ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"],
-            "source": "unitary/toxic-bert (Apache 2.0), ONNX export by Xenova",
+            # Offence labels, then the identities a text mentions (not offences in themselves)
+            "labels": [
+                "toxicity", "severe_toxicity", "obscene", "identity_attack", "insult", "threat", "sexual_explicit",
+                "male", "female", "homosexual_gay_or_lesbian", "christian", "jewish", "muslim", "black", "white",
+                "psychiatric_or_mental_illness",
+            ],
+            "source": "unitary/unbiased-toxic-roberta (Apache 2.0), ONNX export by onnx-community",
         },
     },
     {

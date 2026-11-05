@@ -108,7 +108,7 @@ public class HomeFeedService(
                 .Where(e => cursorMember is null || e.Score < maxScore || string.CompareOrdinal(e.Element, cursorMember) < 0)
                 .Select(e => Guid.Parse(e.Element.ToString()))
                 .ToList();
-            posts.AddRange(await LoadAsync(ids, cancellationToken));
+            posts.AddRange(await LoadAsync(userId, ids, cancellationToken));
 
             if (entries.Length < batchSize)
             {
@@ -121,15 +121,16 @@ public class HomeFeedService(
     private async Task<bool> IsTimelineFullAsync(Guid userId) =>
         await redis.GetDatabase().SortedSetLengthAsync(FeedKeys.ForUser(userId)) >= options.Value.MaxLength;
 
-    // Posts in the given order, skipping any that are deleted or missing, and reposts of deleted posts
-    private async Task<List<HomeFeedPostResponse>> LoadAsync(List<Guid> ids, CancellationToken cancellationToken)
+    // Posts in the given order, skipping any that are deleted, missing or held (unless they're the viewer's own), and
+    // reposts of those
+    private async Task<List<HomeFeedPostResponse>> LoadAsync(Guid userId, List<Guid> ids, CancellationToken cancellationToken)
     {
         if (ids.Count == 0)
         {
             return [];
         }
 
-        var found = await db.Posts.Where(p => ids.Contains(p.Id)).Live(db).ToFeedPosts(db)
+        var found = await db.Posts.Where(p => ids.Contains(p.Id)).Live(db, userId).ToFeedPosts(db)
             .ToDictionaryAsync(p => p.Id, cancellationToken);
         return ids.Where(found.ContainsKey).Select(id => found[id]).ToList();
     }
@@ -137,7 +138,7 @@ public class HomeFeedService(
     // Fan-out on read: the same feed straight from the follow graph
     private Task<List<HomeFeedPostResponse>> FromPostgresAsync(Guid userId, Guid? before, int take, CancellationToken cancellationToken)
     {
-        var posts = db.Posts.Live(db)
+        var posts = db.Posts.Live(db, userId)
             .Where(p => p.AuthorId == userId || db.Follows.Any(f => f.FollowerId == userId && f.FolloweeId == p.AuthorId));
         if (before is { } cursor)
         {

@@ -7,6 +7,7 @@ using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Ranking.Profiles;
+using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Users;
 using StackExchange.Redis;
 
@@ -73,7 +74,10 @@ public class ForYouService(
     {
         var page = session.Posts.Skip(offset).Take(limit).ToList();
         var ids = page.Select(p => p.PostId).ToList();
-        var posts = await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null).ToFeedPosts(db).ToDictionaryAsync(p => p.Id, cancellationToken);
+        // Visible only: a post can be held, or its author suspended, during a session
+        var posts = await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null && p.Status == ContentStatus.Visible
+                && db.Users.Any(u => u.Id == p.AuthorId && u.Status == UserStatus.Active))
+            .ToFeedPosts(db).ToDictionaryAsync(p => p.Id, cancellationToken);
         var results = page.Where(p => posts.ContainsKey(p.PostId)).Select((p, i) =>
         {
             var post = posts[p.PostId];
@@ -284,7 +288,8 @@ public class ForYouService(
         ids.ExceptWith(hidden);
 
         var oldest = profile.Freshness.MaxAgeHours is { } maxAge ? now - TimeSpan.FromHours(maxAge) : DateTime.MinValue;
-        return await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null && p.RepostOfId == null && p.AuthorId != viewerId && p.CreatedAt >= oldest)
+        return await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null && p.Status == ContentStatus.Visible && p.RepostOfId == null
+                && p.AuthorId != viewerId && p.CreatedAt >= oldest && db.Users.Any(u => u.Id == p.AuthorId && u.Status == UserStatus.Active))
             .ToFeedPosts(db).ToListAsync(cancellationToken);
     }
 

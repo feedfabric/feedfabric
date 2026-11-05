@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.IdentityModel.JsonWebTokens;
 using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Api.Auth;
@@ -7,6 +6,7 @@ namespace FeedFabric.Api.Auth;
 public sealed class HttpCurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {
     public string ExternalUserId =>
-        httpContextAccessor.HttpContext?.User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+        // Whichever claim the host's tokens carry it in (AuthOptions.Claims.UserId), as IdentityClaims maps it
+        httpContextAccessor.HttpContext?.User.FindFirstValue(IdentityClaims.UserId)
         ?? throw new InvalidOperationException("No authenticated user on this request.");
 }

@@ -21,9 +21,11 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(PostResultStatus.UserNotFound);
         }
 
-        if (await ViolationAsync(authorId.Value, "post", request.Content, cancellationToken) is { } violation)
+        var verdict = await moderator.CheckAsync(request.Content, cancellationToken);
+        if (verdict is { Action: ModerationAction.Block })
         {
-            return new PostResult(PostResultStatus.ContentViolation, Violation: violation);
+            await RecordAsync(authorId.Value, verdict, request.Content, null, cancellationToken);
+            return new PostResult(PostResultStatus.ContentViolation, Violation: verdict.Category);
         }
 
         var mediaIds = request.MediaIds?.Distinct().ToList() ?? [];
@@ -38,8 +40,14 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             AuthorId = authorId.Value,
             Content = request.Content,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            Status = verdict is null ? ContentStatus.Visible : ContentStatus.Held,
         };
         db.Posts.Add(post);
+        if (verdict is not null)
+        {
+            // Saved with the post, so a held post is always in the review queue
+            db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, post.CreatedAt));
+        }
         // Same SaveChanges as the post, so the event exists exactly when the post does
         db.AddEvent(EventTypes.PostCreated, post.Id.ToString(), post.AuthorId, new PostCreatedEvent
         {
@@ -74,13 +82,22 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(PostResultStatus.EditWindowClosed);
         }
 
-        if (await ViolationAsync(post.AuthorId, "post", request.Content, cancellationToken) is { } violation)
+        var verdict = await moderator.CheckAsync(request.Content, cancellationToken);
+        if (verdict is { Action: ModerationAction.Block })
         {
-            return new PostResult(PostResultStatus.ContentViolation, Violation: violation);
+            await RecordAsync(post.AuthorId, verdict, request.Content, post.Id, cancellationToken);
+            return new PostResult(PostResultStatus.ContentViolation, Violation: verdict.Category);
         }
 
         post.Content = request.Content;
         post.EditedAt = now;
+        // An edit that needs a look holds the post again, even if a reviewer approved the earlier text. A held post
+        // stays held until reviewed, however it's edited.
+        if (verdict is not null && post.Status == ContentStatus.Visible)
+        {
+            post.Status = ContentStatus.Held;
+            db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, now));
+        }
 
         // New text, new tags. Mentions that were removed go; new ones are added and announced.
         db.PostTags.RemoveRange(await db.PostTags.Where(t => t.PostId == post.Id).ToListAsync(cancellationToken));
@@ -116,26 +133,13 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
         return PostResult.Ok(post);
     }
 
-    // The rule the text breaks, recorded for moderators, or null when it's fine
-    private async Task<string?> ViolationAsync(Guid userId, string kind, string text, CancellationToken cancellationToken)
+    // A block is recorded on its own, since nothing else is saved
+    private async Task RecordAsync(Guid userId, ModerationVerdict verdict, string text, Guid? postId, CancellationToken cancellationToken)
     {
-        var violation = await moderator.CheckAsync(text, cancellationToken);
-        var category = violation?.Category;
-        if (violation is { } found)
-        {
-            db.ModerationEvents.Add(new ModerationEventEntity
-            {
-                UserId = userId,
-                Kind = kind,
-                Category = found.Category,
-                Score = found.Score,
-                Excerpt = text.Length > 120 ? text[..117] + "…" : text,
-                CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            });
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        return category;
+        db.ModerationEvents.Add(ModerationEventEntity.For(userId, "post", verdict, text, postId, null, timeProvider.GetUtcNow().UtcDateTime));
+        await db.SaveChangesAsync(cancellationToken);
     }
+
 
     // Only the author's own images that passed scanning and aren't on another post can be attached
     private async Task<PostResultStatus> CheckMediaAsync(Guid authorId, List<Guid> mediaIds, CancellationToken cancellationToken)
@@ -162,7 +166,7 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
 
     private async Task<(PostResultStatus Status, PostEntity? Post)> FindOwnPostAsync(string externalUserId, Guid postId, CancellationToken cancellationToken)
     {
-        var post = await db.Posts.SingleOrDefaultAsync(p => p.Id == postId && p.DeletedAt == null, cancellationToken);
+        var post = await db.Posts.SingleOrDefaultAsync(p => p.Id == postId && p.DeletedAt == null && p.Status != ContentStatus.Removed, cancellationToken);
         if (post is null)
         {
             return (PostResultStatus.NotFound, null);

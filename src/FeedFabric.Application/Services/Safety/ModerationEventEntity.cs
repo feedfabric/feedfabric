@@ -2,13 +2,18 @@ using FeedFabric.Application.Services;
 
 namespace FeedFabric.Application.Services.Safety;
 
-// Something that was stopped before anyone saw it: a post, comment or photo that broke a rule. Kept so moderators
-// and the dashboard can see what is being caught, and so repeat offenders can be found.
+// Something moderation acted on: a post, comment or photo that was blocked, held for review, or reported enough to be
+// held. Kept so the dashboard can show what is being caught, so repeat offenders can be found, and, once a reviewer
+// has decided (Decision), as labelled examples for training the classifier.
 public class ModerationEventEntity : EntityBase
 {
+    // Whose post, comment or photo it was
     public required Guid UserId { get; set; }
 
-    // "post", "comment" or "photo"
+    // ModerationActions
+    public string Action { get; set; } = ModerationActions.Blocked;
+
+    // "post", "comment", "photo", or "user" for a suspension or reinstatement
     public required string Kind { get; set; }
 
     // ModerationCategories
@@ -20,7 +25,61 @@ public class ModerationEventEntity : EntityBase
     // The start of the text that was stopped (never the photo itself, which is deleted)
     public string? Excerpt { get; set; }
 
+    // What was held or reported; blocked things were never saved, so they have neither
+    public Guid? PostId { get; set; }
+
+    public Guid? CommentId { get; set; }
+
     public DateTime CreatedAt { get; set; }
+
+    // Set when a reviewer decides: ReviewDecisions, and who (their external user ID)
+    public string? Decision { get; set; }
+
+    public string? ReviewedBy { get; set; }
+
+    public DateTime? ReviewedAt { get; set; }
+
+    public static string ExcerptOf(string text) => text.Length > 120 ? text[..117] + "…" : text;
+
+    // The classifier stopped a post or comment. Only held ones keep what they're about; blocked ones were never saved.
+    public static ModerationEventEntity For(Guid userId, string kind, ModerationVerdict verdict, string text, Guid? postId, Guid? commentId,
+        DateTime at) => new()
+    {
+        UserId = userId,
+        Kind = kind,
+        Action = verdict.Action == ModerationAction.Block ? ModerationActions.Blocked : ModerationActions.Held,
+        Category = verdict.Category,
+        Score = verdict.Score,
+        Excerpt = ExcerptOf(text),
+        PostId = verdict.Action == ModerationAction.Hold ? postId : null,
+        CommentId = verdict.Action == ModerationAction.Hold ? commentId : null,
+        CreatedAt = at,
+    };
+}
+
+public static class ModerationActions
+{
+    // Stopped when posted; nothing was saved
+    public const string Blocked = "blocked";
+
+    // Saved, but only the author sees it until a reviewer decides
+    public const string Held = "held";
+
+    // Enough people reported it that it was held
+    public const string Reported = "reported";
+
+    // A reviewer removed it without it having been flagged
+    public const string Reviewed = "reviewed";
+}
+
+public static class ReviewDecisions
+{
+    public const string Approved = "approved";
+    public const string Removed = "removed";
+
+    // On a Kind "user" event: the account's new status
+    public const string Suspended = "suspended";
+    public const string Reinstated = "reinstated";
 }
 
 public static class ModerationCategories
@@ -30,20 +89,32 @@ public static class ModerationCategories
     public const string LinkSpam = "link_spam";
     public const string Flooding = "flooding";
 
+    // Held because enough people reported it
+    public const string Reported = "reported";
+
+    // Removed by a reviewer who found it themselves
+    public const string Manual = "manual";
+
+    // Staff suspended or reinstated the account (Kind "user")
+    public const string Suspended = "suspended";
+    public const string Reinstated = "reinstated";
+
     // From the offensive-language classifier
     public const string SevereToxicity = "severe_toxicity";
     public const string Threat = "threat";
     public const string Hate = "hate";
     public const string Insult = "insult";
     public const string Obscene = "obscene";
+    public const string SexuallyExplicit = "sexual_explicit";
 
     public static string ForToxicityLabel(string label) => label switch
     {
-        "severe_toxic" => SevereToxicity,
+        "severe_toxicity" => SevereToxicity,
         "threat" => Threat,
-        "identity_hate" => Hate,
+        "identity_attack" => Hate,
         "insult" => Insult,
         "obscene" => Obscene,
+        "sexual_explicit" => SexuallyExplicit,
         _ => label,
     };
 }

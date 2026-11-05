@@ -22,6 +22,7 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 |---|---|---|---|
 | `validation_failed` | 400 | | See `errors` below |
 | `user.not_synced` | 404 | `externalUserId` | The signed-in user has no local user record yet |
+| `user.suspended` | 403 | | The account is suspended: it can read, but not post, comment, like, repost, follow, report or upload |
 | `post.not_found` | 404 | | No such post, or it was deleted. Liking or commenting on a repost's own ID also gives this; use the original's |
 | `post.not_author` | 403 | | Only the author can edit or delete a post |
 | `post.edit_window_closed` | 409 | `editWindowMinutes` | The edit window has passed |

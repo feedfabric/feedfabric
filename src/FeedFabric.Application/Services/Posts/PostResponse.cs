@@ -1,3 +1,5 @@
+using FeedFabric.Application.Services.Safety;
+
 namespace FeedFabric.Application.Services.Posts;
 
 public class PostResponse
@@ -15,6 +17,9 @@ public class PostResponse
     // Set on a repost: the post it shares
     public Guid? RepostOfId {get;set;}
 
+    // Held for review: saved, but only the author sees it until a reviewer decides
+    public bool IsHeld {get;set;}
+
     public static PostResponse From(PostEntity post) => new()
     {
         Id = post.Id,
@@ -23,5 +28,6 @@ public class PostResponse
         CreatedAt = post.CreatedAt,
         EditedAt = post.EditedAt,
         RepostOfId = post.RepostOfId,
+        IsHeld = post.Status == ContentStatus.Held,
     };
 }

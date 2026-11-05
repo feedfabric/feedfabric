@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Ranking;
+using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Likes;
@@ -66,8 +67,10 @@ public class LikeService(AppDbContext db, FeedLog feedLog, TimeProvider timeProv
             return (LikeResultStatus.UserNotFound, default, default);
         }
 
+        // Only posts the user can see: visible ones, and their own held ones
         var authorId = await db.Posts
-            .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null)
+            .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null
+                && (p.Status == ContentStatus.Visible || (p.Status == ContentStatus.Held && p.AuthorId == userId)))
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         return authorId is null

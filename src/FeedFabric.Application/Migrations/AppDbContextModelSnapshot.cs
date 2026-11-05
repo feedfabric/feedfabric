@@ -46,6 +46,11 @@ namespace FeedFabric.Application.Migrations
                     b.Property<Guid>("PostId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
@@ -364,13 +369,25 @@ namespace FeedFabric.Application.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("Excerpt")
                         .HasMaxLength(120)
@@ -380,6 +397,16 @@ namespace FeedFabric.Application.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<double>("Score")
                         .HasColumnType("double precision");
@@ -391,9 +418,51 @@ namespace FeedFabric.Application.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("PostId", "CommentId");
+
                     b.HasIndex("UserId", "CreatedAt");
 
+                    b.HasIndex(new[] { "CreatedAt" }, "IX_ModerationEvents_Open")
+                        .HasFilter("\"ReviewedAt\" IS NULL AND \"Action\" <> 'blocked'");
+
                     b.ToTable("ModerationEvents");
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Safety.ReportEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("ReporterId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommentId");
+
+                    b.HasIndex("ReporterId");
+
+                    b.HasIndex("PostId", "CommentId", "ReporterId")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PostId", "CommentId", "ReporterId"), false);
+
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("FeedFabric.Application.Services.Tags.PostTagEntity", b =>
@@ -432,6 +501,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("text");
+
                     b.Property<string>("ExternalUserId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -454,7 +526,8 @@ namespace FeedFabric.Application.Migrations
                     b.HasIndex("ExternalUserId")
                         .IsUnique();
 
-                    b.HasIndex("Username");
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -483,6 +556,11 @@ namespace FeedFabric.Application.Migrations
 
                     b.Property<Guid?>("RepostOfId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 
@@ -591,6 +669,26 @@ namespace FeedFabric.Application.Migrations
                     b.HasOne("PostEntity", null)
                         .WithMany()
                         .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Safety.ReportEntity", b =>
+                {
+                    b.HasOne("FeedFabric.Application.Services.Comments.CommentEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PostEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FeedFabric.Application.Services.Users.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

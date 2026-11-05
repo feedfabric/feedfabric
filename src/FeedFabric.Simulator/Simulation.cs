@@ -155,7 +155,7 @@ public class Simulation(
         var answering = post.AuthorUsername;
         if (random.NextDouble() < settings.ReplyChance)
         {
-            var existing = await commentService.ListAsync(post.Id, new CommentQuery { Limit = 10 }, cancellationToken);
+            var existing = await commentService.ListAsync(reader, post.Id, new CommentQuery { Limit = 10 }, cancellationToken);
             var candidates = existing.Page?.Comments.Where(c => !c.IsDeleted && c.AuthorExternalUserId != reader).ToList() ?? [];
             if (candidates.Count > 0)
             {

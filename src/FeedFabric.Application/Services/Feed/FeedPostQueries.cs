@@ -1,14 +1,25 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Tags;
+using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Feed;
 
 public static class FeedPostQueries
 {
-    // Not deleted, and for a repost, its original isn't deleted either
-    public static IQueryable<PostEntity> Live(this IQueryable<PostEntity> posts, AppDbContext db) =>
-        posts.Where(p => p.DeletedAt == null && (p.RepostOfId == null || db.Posts.Any(o => o.Id == p.RepostOfId && o.DeletedAt == null)));
+    // Not deleted, visible to everyone, and by an account that isn't suspended; for a repost, the same of its original
+    public static IQueryable<PostEntity> Live(this IQueryable<PostEntity> posts, AppDbContext db) => posts.Live(db, null);
+
+    // As Live, plus the viewer's own held posts, which only they see until a reviewer decides, and their own posts
+    // while they're suspended, since a suspended user can still read
+    public static IQueryable<PostEntity> Live(this IQueryable<PostEntity> posts, AppDbContext db, Guid? viewerId) =>
+        posts.Where(p => p.DeletedAt == null
+            && (p.Status == ContentStatus.Visible || (p.Status == ContentStatus.Held && p.AuthorId == viewerId))
+            && (p.AuthorId == viewerId || db.Users.Any(u => u.Id == p.AuthorId && u.Status == UserStatus.Active))
+            && (p.RepostOfId == null || db.Posts.Any(o => o.Id == p.RepostOfId && o.DeletedAt == null
+                && (o.Status == ContentStatus.Visible || (o.Status == ContentStatus.Held && o.AuthorId == viewerId))
+                && (o.AuthorId == viewerId || db.Users.Any(u => u.Id == o.AuthorId && u.Status == UserStatus.Active)))));
 
     // Fills in RepostOf on each repost with the post it shares
     public static async Task AttachRepostsAsync(this IReadOnlyList<HomeFeedPostResponse> posts, AppDbContext db, CancellationToken cancellationToken)
@@ -49,6 +60,7 @@ public static class FeedPostQueries
             CreatedAt = p.CreatedAt,
             EditedAt = p.EditedAt,
             RepostOfId = p.RepostOfId,
+            IsHeld = p.Status == ContentStatus.Held,
             Tags = db.PostTags.Where(t => t.PostId == p.Id)
                 .OrderBy(t => t.Source).ThenBy(t => t.Tag)
                 .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })
