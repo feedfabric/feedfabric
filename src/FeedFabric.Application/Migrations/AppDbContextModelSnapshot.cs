@@ -481,9 +481,16 @@ namespace FeedFabric.Application.Migrations
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("RepostOfId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId", "Id");
+
+                    b.HasIndex("RepostOfId", "AuthorId")
+                        .IsUnique()
+                        .HasFilter("\"RepostOfId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("Posts");
                 });
@@ -604,6 +611,11 @@ namespace FeedFabric.Application.Migrations
                         .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("PostEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RepostOfId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

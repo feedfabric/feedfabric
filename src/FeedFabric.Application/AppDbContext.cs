@@ -67,6 +67,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PostEntity>()
             .HasIndex(p => new { p.AuthorId, p.Id });
 
+        modelBuilder.Entity<PostEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(p => p.RepostOfId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // One live repost per user per post, and serves repost counts
+        modelBuilder.Entity<PostEntity>()
+            .HasIndex(p => new { p.RepostOfId, p.AuthorId })
+            .IsUnique()
+            .HasFilter("\"RepostOfId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
         modelBuilder.Entity<FollowEntity>()
             .HasKey(f => new { f.FollowerId, f.FolloweeId });
 

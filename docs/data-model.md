@@ -54,7 +54,8 @@ Replies, quotes and reposts all live in this table.
 | Content | `string` | Empty for plain reposts |
 | ParentPostId | `Guid?` | Post being replied to |
 | RootPostId | `Guid?` | Top of the thread |
-| QuotedPostId | `Guid?` | For quotes and reposts |
+| QuotedPostId | `Guid?` | For quotes |
+| RepostOfId | `Guid?` | For reposts. One live repost per user per post (unique filtered index); undoing one soft-deletes it |
 | LikeCount | `int` | Denormalized counter |
 | ReplyCount | `int` | |
 | RepostCount | `int` | |
