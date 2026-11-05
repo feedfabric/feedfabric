@@ -11,6 +11,7 @@ public enum FeedSignal
     Liked,
     Commented,
     NotInterested,
+    ShowMore,
 }
 
 // Writes FeedLogEntity rows as feeds are served, and fills in their labels as viewers act on the posts
@@ -81,7 +82,9 @@ public class FeedLog(AppDbContext db, IConnectionMultiplexer redis, TimeProvider
             FeedSignal.Opened => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.Opened, true).SetProperty(f => f.Seen, true), cancellationToken),
             FeedSignal.Liked => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.Liked, true).SetProperty(f => f.Seen, true), cancellationToken),
             FeedSignal.Commented => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.Commented, true).SetProperty(f => f.Seen, true), cancellationToken),
-            FeedSignal.NotInterested => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.NotInterested, true).SetProperty(f => f.Seen, true), cancellationToken),
+            // The two cancel each other out: the latest press is what the viewer meant
+            FeedSignal.NotInterested => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.NotInterested, true).SetProperty(f => f.ShowMore, false).SetProperty(f => f.Seen, true), cancellationToken),
+            FeedSignal.ShowMore => await rows.ExecuteUpdateAsync(s => s.SetProperty(f => f.ShowMore, true).SetProperty(f => f.NotInterested, false).SetProperty(f => f.Seen, true), cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(signal)),
         };
     }

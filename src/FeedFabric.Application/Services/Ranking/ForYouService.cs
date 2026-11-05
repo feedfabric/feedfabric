@@ -106,10 +106,22 @@ public class ForYouService(
     }
 
     // "Not interested": the post never comes back, and its author and topics count against it from now on
-    public async Task<bool> NotInterestedAsync(string externalUserId, Guid postId, CancellationToken cancellationToken)
+    public Task<bool> NotInterestedAsync(string externalUserId, Guid postId, CancellationToken cancellationToken) =>
+        FeedbackAsync(externalUserId, postId, Feedback.Less, cancellationToken);
+
+    // "Show more": the opposite. Its author and topics count for it from now on, as much as "Not interested" counts
+    // against, which is more than a like; and if it was hidden, it can come back.
+    public Task<bool> ShowMoreAsync(string externalUserId, Guid postId, CancellationToken cancellationToken) =>
+        FeedbackAsync(externalUserId, postId, Feedback.More, cancellationToken);
+
+    // A viewer's feedback on a post is a state, not a counter: pressing the same button again changes nothing, and
+    // switching from one to the other first undoes the earlier one. Every key it touches is the viewer's own and they
+    // change in one transaction, so a failure never leaves half of it applied, however Redis is sharded.
+    private async Task<bool> FeedbackAsync(string externalUserId, Guid postId, Feedback feedback, CancellationToken cancellationToken)
     {
         var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
-        var authorId = await db.Posts.Where(p => p.Id == postId).Select(p => (Guid?)p.AuthorId).SingleOrDefaultAsync(cancellationToken);
+        // Only posts everyone can see: feedback on removed or held posts would linger for when they come back
+        var authorId = await db.Posts.Where(p => p.Id == postId).Live(db).Select(p => (Guid?)p.AuthorId).SingleOrDefaultAsync(cancellationToken);
         if (viewerId is null || authorId is null)
         {
             return false;
@@ -117,14 +129,39 @@ public class ForYouService(
 
         var tags = await db.PostTags.Where(t => t.PostId == postId).Select(t => new { t.Tag, t.Confidence }).ToListAsync(cancellationToken);
         var database = redis.GetDatabase();
-        await database.SetAddAsync(HiddenKey(viewerId.Value), postId.ToString());
-        await database.KeyExpireAsync(HiddenKey(viewerId.Value), HiddenLifetime);
-        await database.SortedSetIncrementAsync(EngagementKeys.Affinity(viewerId.Value), authorId.Value.ToString(), -3);
-        foreach (var tag in tags)
+        var feedbackKey = FeedbackKey(viewerId.Value);
+        var field = postId.ToString();
+        var now = (int)feedback;
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            await database.SortedSetIncrementAsync(EngagementKeys.Topics(viewerId.Value), tag.Tag, -2 * tag.Confidence);
+            var stored = await database.HashGetAsync(feedbackKey, field);
+            var before = stored.HasValue ? (int)stored : 0;
+            if (before == now)
+            {
+                break;
+            }
+
+            // Only applies if nobody changed this post's feedback since it was read; otherwise read it again
+            var change = now - before;
+            var transaction = database.CreateTransaction();
+            transaction.AddCondition(stored.HasValue ? Condition.HashEqual(feedbackKey, field, stored) : Condition.HashNotExists(feedbackKey, field));
+            _ = transaction.HashSetAsync(feedbackKey, field, now);
+            _ = transaction.KeyExpireAsync(feedbackKey, HiddenLifetime);
+            _ = feedback == Feedback.Less
+                ? transaction.SetAddAsync(HiddenKey(viewerId.Value), field)
+                : transaction.SetRemoveAsync(HiddenKey(viewerId.Value), field);
+            _ = transaction.KeyExpireAsync(HiddenKey(viewerId.Value), HiddenLifetime);
+            _ = transaction.SortedSetIncrementAsync(EngagementKeys.Affinity(viewerId.Value), authorId.Value.ToString(), FeedbackAuthorWeight * change);
+            foreach (var tag in tags)
+            {
+                _ = transaction.SortedSetIncrementAsync(EngagementKeys.Topics(viewerId.Value), tag.Tag, FeedbackTopicWeight * change * tag.Confidence);
+            }
+            if (await transaction.ExecuteAsync())
+            {
+                break;
+            }
         }
-        await feedLog.MarkAsync(viewerId.Value, postId, FeedSignal.NotInterested, cancellationToken);
+        await feedLog.MarkAsync(viewerId.Value, postId, feedback == Feedback.Less ? FeedSignal.NotInterested : FeedSignal.ShowMore, cancellationToken);
         return true;
     }
 
@@ -303,6 +340,19 @@ public class ForYouService(
     private static string SessionKey(Guid viewerId, ResolvedProfile profile) => $"foryou:{viewerId}:{profile.Label}";
 
     private static string HiddenKey(Guid viewerId) => $"hidden:{viewerId}";
+
+    // Post ID to the viewer's feedback on it (Feedback), kept as long as the hidden set
+    private static string FeedbackKey(Guid viewerId) => $"feedback:{viewerId}";
+
+    // What one press is worth to the author's affinity and, times the tag's confidence, to each of the post's topics
+    private const double FeedbackAuthorWeight = 3;
+    private const double FeedbackTopicWeight = 2;
+
+    private enum Feedback
+    {
+        Less = -1,
+        More = 1,
+    }
 
     private static readonly int Age = RankingFeatures.Index("age_minutes");
     private static readonly int Follows = RankingFeatures.Index("follows_author");

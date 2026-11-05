@@ -318,6 +318,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<DateTime>("ServedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("ShowMore")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid>("ViewerId")
                         .HasColumnType("uuid");
 

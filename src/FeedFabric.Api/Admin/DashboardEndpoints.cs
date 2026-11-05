@@ -188,7 +188,11 @@ public static class DashboardEndpoints
                 .GroupBy(f => f.Explored)
                 .Select(g => new { Explored = g.Key, Seen = g.Count(), Engaged = g.Count(f => f.Opened || f.Liked || f.Commented) })
                 .ToListAsync(cancellationToken);
-            var notInterested = await db.FeedLog.CountAsync(f => f.ServedAt >= since && f.NotInterested, cancellationToken);
+            // Both in one pass over the window
+            var feedback = await db.FeedLog.Where(f => f.ServedAt >= since && (f.NotInterested || f.ShowMore))
+                .GroupBy(_ => 1)
+                .Select(g => new { NotInterested = g.Count(f => f.NotInterested), ShowMore = g.Count(f => f.ShowMore) })
+                .SingleOrDefaultAsync(cancellationToken);
 
             // For You by ranking profile: which settings people respond to best (the simulator splits readers between
             // Simulator:ForYouProfiles)
@@ -204,6 +208,7 @@ public static class DashboardEndpoints
                     Commented = g.Count(f => f.Commented),
                     Engaged = g.Count(f => f.Opened || f.Liked || f.Commented),
                     NotInterested = g.Count(f => f.NotInterested),
+                    ShowMore = g.Count(f => f.ShowMore),
                     DwellViews = g.Count(f => f.DwellMs > 0),
                     DwellMs = g.Sum(f => (long)f.DwellMs),
                 })
@@ -219,6 +224,7 @@ public static class DashboardEndpoints
                     CommentRate = rate(p.Commented, p.Seen),
                     EngagementRate = rate(p.Engaged, p.Seen),
                     NotInterestedRate = rate(p.NotInterested, p.Seen),
+                    ShowMoreRate = rate(p.ShowMore, p.Seen),
                     AverageDwellSeconds = p.DwellViews == 0 ? (double?)null : Math.Round(p.DwellMs / 1000.0 / p.DwellViews, 1),
                 })
                 .ToList();
@@ -227,7 +233,8 @@ public static class DashboardEndpoints
             var ranking = new
             {
                 Exploration = exploration.Select(e => new { e.Explored, e.Seen, EngagementRate = rate(e.Engaged, e.Seen) }),
-                NotInterested = notInterested,
+                NotInterested = feedback?.NotInterested ?? 0,
+                ShowMore = feedback?.ShowMore ?? 0,
                 Ranker = model.Info is null ? "heuristic" : $"model:{model.Info.Version}",
                 Model = model.Info,
                 Experiment = experiment,

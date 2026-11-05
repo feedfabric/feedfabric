@@ -291,6 +291,7 @@ export interface Dashboard {
     trainingPositives: number
     exploration: { explored: boolean; seen: number; engagementRate: number }[]
     notInterested: number
+    showMore: number
     profiles: ProfileExperiment[]
   }
   safety: {
@@ -341,6 +342,7 @@ export interface ProfileExperiment {
   commentRate: number
   engagementRate: number
   notInterestedRate: number
+  showMoreRate: number
   averageDwellSeconds: number | null
 }
 

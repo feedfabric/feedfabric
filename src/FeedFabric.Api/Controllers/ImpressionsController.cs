@@ -49,6 +49,14 @@ public class ImpressionsController(IImpressionService impressionService, ForYouS
             ? NoContent()
             : this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.PostNotFound, "Post not found.");
 
+    // POST /userfeed/posts/{postId}/show-more: the opposite of not-interested. Its author and topics count for it for
+    // this user from now on, and a post they'd hidden can come back.
+    [HttpPost("posts/{postId:guid}/show-more")]
+    public async Task<IActionResult> ShowMore(Guid postId, CancellationToken cancellationToken) =>
+        await forYou.ShowMoreAsync(currentUser.ExternalUserId, postId, cancellationToken)
+            ? NoContent()
+            : this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.PostNotFound, "Post not found.");
+
     private ObjectResult NotSynced() => this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.UserNotSynced,
         $"User {currentUser.ExternalUserId} has not been synced.", new { externalUserId = currentUser.ExternalUserId });
 }
