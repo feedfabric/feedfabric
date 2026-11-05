@@ -31,12 +31,21 @@ public class TextModeratorTests
     [InlineData("First gentle walk since the injury, 40 minutes, legs like jelly. Proud of myself.")]
     [InlineData("Bloody knackered after that run, damn hills. Worth it though.")]
     [InlineData("Day 21 of no screens after 9 and I sleep so much better")]
-    [InlineData("Kill it at the race tomorrow everyone!")]
-    [InlineData("This hill is a bitch but I love it")]
     [InlineData("Sex after pregnancy hurt for months, nobody warns you. Talk to your GP.")]
     public async Task The_classifier_lets_everyday_posts_and_mild_swearing_through(string text)
     {
         Models.SkipUnlessPresent("models/safety/toxicity");
+
+        Assert.Null(await Create().CheckAsync(text, TestContext.Current.CancellationToken));
+    }
+
+    // The pretrained model flags these; fine-tuning on this app's wording is what lets them through
+    [Theory]
+    [InlineData("Kill it at the race tomorrow everyone!")]
+    [InlineData("This hill is a bitch but I love it")]
+    public async Task The_tuned_classifier_lets_sporting_talk_through(string text)
+    {
+        Models.SkipUnlessTuned("models/safety/toxicity");
 
         Assert.Null(await Create().CheckAsync(text, TestContext.Current.CancellationToken));
     }
