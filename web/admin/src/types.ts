@@ -178,6 +178,7 @@ export interface SystemInfo {
     maxRepeatedCharacters: number
     blockedTerms: number
   }
+  media: { maxPerPost: number; maxUploadBytes: number; allowedTypes: string[] }
   models: SystemModel[]
   ranker: { loaded: boolean; version?: string; trainedAt?: string; trainingRows?: number }
   users: Record<string, number>
@@ -404,4 +405,47 @@ export interface RankingVocabulary {
   presets: { key: string; settings: RankingProfile }[]
   defaults: RankingProfile
   defaultProfile: string
+}
+
+// Posting from the admin panel, through the same endpoints members use
+
+export interface Upload {
+  mediaId: string
+  uploadUrl: string
+  contentType: string
+  expiresAt: string
+}
+
+export type MediaState = 'awaitingUpload' | 'processing' | 'ready' | 'rejected'
+
+// GET /media/{id}: what the uploader sees
+export interface MediaStatus {
+  id: string
+  status: MediaState
+  rejectionReason: string | null
+  width: number | null
+  height: number | null
+  url: string | null
+  thumbnailUrl: string | null
+}
+
+// GET /admin/media/{id}: what staff see, with the nudity classifier's score and the line it rejects at
+export interface AdminMedia {
+  id: string
+  owner: UserRef
+  status: MediaState
+  rejectionReason: string | null
+  nudityScore: number | null
+  nudityRejectAt: number
+  width: number | null
+  height: number | null
+  createdAt: string
+  processedAt: string | null
+}
+
+export interface CreatedPost {
+  id: string
+  content: string
+  createdAt: string
+  isHeld: boolean
 }

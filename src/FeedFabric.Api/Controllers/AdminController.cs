@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
+using FeedFabric.Api.Errors;
+using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Storage;
@@ -38,12 +41,36 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
         };
     }
 
+    // GET /admin/media/{id}: an upload as staff see it, with the nudity classifier's score and the line it rejects at, for
+    // checking the photo checks from the admin panel. Moderators only; the owner's own GET /media/{id} leaves the score out.
+    [HttpGet("media/{mediaId:guid}")]
+    [Authorize(Policy = ModerationPolicies.Reviewer)]
+    public async Task<IActionResult> Media(Guid mediaId, AppDbContext db, IOptions<ModerationOptions> moderation, CancellationToken cancellationToken)
+    {
+        var media = await db.Media.AsNoTracking().Where(m => m.Id == mediaId)
+            .Join(db.Users, m => m.OwnerId, u => u.Id, (m, u) => new
+            {
+                m.Id, Owner = new UserRef(u.ExternalUserId, u.Username), m.Status, m.RejectionReason, m.NudityScore, m.Width, m.Height,
+                m.CreatedAt, m.ProcessedAt,
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (media is null)
+        {
+            return this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.MediaNotFound, "Media not found.");
+        }
+        return Ok(new
+        {
+            media.Id, media.Owner, Status = MediaStatusNames.Of(media.Status), media.RejectionReason,
+            media.NudityScore, NudityRejectAt = moderation.Value.NudityRejectAt, media.Width, media.Height, media.CreatedAt, media.ProcessedAt,
+        });
+    }
+
     // GET /admin/system: sign-in, moderation settings, models and the event pipeline. No secret values: a signing key
     // only shows as set or not.
     [HttpGet("system")]
     [Authorize(Policy = AdminPolicies.Staff)]
     public async Task<object> System(AppDbContext db, IBlobStorage storage, RankerModel ranker, IOptions<AuthOptions> auth,
-        IOptions<ModerationOptions> moderation, TimeProvider timeProvider, CancellationToken cancellationToken)
+        IOptions<ModerationOptions> moderation, IOptions<MediaOptions> mediaOptions, TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var models = new List<object>();
@@ -101,6 +128,8 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
                 m.MaxRepeatedCharacters,
                 BlockedTerms = m.BlockedTerms.Count,
             },
+            // What uploads may be, so the admin panel checks the same limits the server does
+            Media = new { mediaOptions.Value.MaxPerPost, mediaOptions.Value.MaxUploadBytes, AllowedTypes = MediaOptions.AllowedContentTypes },
             Models = models,
             Ranker = ranker.Info is { } info
                 ? new { Loaded = true, info.Version, info.TrainedAt, info.TrainingRows }

@@ -25,7 +25,11 @@ const sections = computed<SidebarSection[]>(() => [
   {
     title: 'Community',
     show: !!me.value?.moderator,
-    links: [{ to: '/users', label: 'Users', icon: 'users' as const }, { to: '/posts', label: 'Posts', icon: 'message' as const }],
+    links: [
+      { to: '/users', label: 'Users', icon: 'users' as const },
+      { to: '/posts', label: 'Posts', icon: 'message' as const },
+      { to: '/compose', label: 'New post', icon: 'edit' as const },
+    ],
   },
   { title: 'Ranking', show: !!me.value?.rankingAdmin, links: [{ to: '/studio', label: 'Feed studio', icon: 'sparkle' as const }] },
   { title: 'System', show: true, links: [{ to: '/system', label: 'Settings and models', icon: 'settings' as const }] },

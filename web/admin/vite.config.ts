@@ -25,6 +25,9 @@ export default defineConfig({
       '/ranking': api,
       // Images on posts: in development, LocalBlobStorage's signed links on the API
       '/blobs': api,
+      // Posting from the panel uses the member endpoints
+      '/media': api,
+      '/userfeed': api,
     },
   },
   // A static site of its own, deployed apart from the member-facing app and served behind the same API

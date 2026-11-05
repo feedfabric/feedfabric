@@ -126,13 +126,7 @@ public class MediaService(AppDbContext db, IBlobStorage storage, IOptions<MediaO
         return new MediaResponse
         {
             Id = media.Id,
-            Status = media.Status switch
-            {
-                MediaStatus.AwaitingUpload => "awaitingUpload",
-                MediaStatus.Processing => "processing",
-                MediaStatus.Ready => "ready",
-                _ => "rejected",
-            },
+            Status = MediaStatusNames.Of(media.Status),
             RejectionReason = media.RejectionReason,
             Width = media.Width,
             Height = media.Height,

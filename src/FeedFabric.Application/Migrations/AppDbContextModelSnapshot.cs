@@ -120,6 +120,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<string>("LargeKey")
                         .HasColumnType("text");
 
+                    b.Property<double?>("NudityScore")
+                        .HasColumnType("double precision");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 

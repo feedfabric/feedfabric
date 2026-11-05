@@ -13,6 +13,12 @@ describe('FabricButton', () => {
     expect(mount(FabricButton, { slots: { default: 'Save' } }).element.tagName).toBe('BUTTON')
   })
 
+  it('is a plain link for to when there is no router', () => {
+    const wrapper = mount(FabricButton, { props: { to: '/posts/1' }, slots: { default: 'Open' } })
+    expect(wrapper.element.tagName).toBe('A')
+    expect(wrapper.attributes('href')).toBe('/posts/1')
+  })
+
   it("can't be pressed while loading, and says it's busy", async () => {
     const wrapper = mount(FabricButton, { props: { loading: true }, slots: { default: 'Save' }, attrs: { onClick: vi.fn() } })
     expect(wrapper.attributes('disabled')).toBeDefined()
