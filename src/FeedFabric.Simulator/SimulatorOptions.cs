@@ -51,6 +51,9 @@ public class SimulatorOptions
     // Chance of pressing "Not interested" on an off-topic post
     public double NotInterestedChance { get; set; } = 0.015;
 
+    // Chance of pressing "Show more" on a post that fully interests them at the top of the feed; less further down
+    public double ShowMoreChance { get; set; } = 0.01;
+
     // Chance of commenting on a post the reader just liked, and of replying to a comment already there instead
     public double CommentChance { get; set; } = 0.15;
 

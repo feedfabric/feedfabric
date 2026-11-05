@@ -44,7 +44,7 @@ public sealed class SuspendedUsers(RequestDelegate next, IMemoryCache cache)
     private static bool IsReadingSignal(PathString path) =>
         path.StartsWithSegments("/userfeed/impressions") || path.StartsWithSegments("/userfeed/dwell")
         || (path.StartsWithSegments("/userfeed/posts", out var rest)
-            && rest.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) is [_, "open" or "not-interested"]);
+            && rest.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) is [_, "open" or "not-interested" or "show-more"]);
 
     private static bool IsStaffRoute(PathString path) => path.StartsWithSegments("/admin") || path.StartsWithSegments("/ranking");
 
