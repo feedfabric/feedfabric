@@ -116,12 +116,16 @@ public class ForYouService(
 
     // A viewer's feedback on a post is a state, not a counter: pressing the same button again changes nothing, and
     // switching from one to the other first undoes the earlier one. Every key it touches is the viewer's own and they
-    // change in one transaction, so a failure never leaves half of it applied, however Redis is sharded.
+    // change in one transaction, so a failure never leaves half of it applied. On a Redis cluster those keys must share
+    // a slot, which they don't yet: putting each viewer's keys under one hash tag is part of making it shardable
+    // (docs/production-readiness.md).
     private async Task<bool> FeedbackAsync(string externalUserId, Guid postId, Feedback feedback, CancellationToken cancellationToken)
     {
         var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
-        // Only posts everyone can see: feedback on removed or held posts would linger for when they come back
-        var authorId = await db.Posts.Where(p => p.Id == postId).Live(db).Select(p => (Guid?)p.AuthorId).SingleOrDefaultAsync(cancellationToken);
+        // "Show more" only on posts everyone can see, so a boost doesn't linger for a removed post that comes back.
+        // "Not interested" on any post: a post held or removed after it was shown can still be waved away.
+        var posts = db.Posts.Where(p => p.Id == postId);
+        var authorId = await (feedback == Feedback.More ? posts.Live(db) : posts).Select(p => (Guid?)p.AuthorId).SingleOrDefaultAsync(cancellationToken);
         if (viewerId is null || authorId is null)
         {
             return false;
@@ -132,13 +136,19 @@ public class ForYouService(
         var feedbackKey = FeedbackKey(viewerId.Value);
         var field = postId.ToString();
         var now = (int)feedback;
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 1; ; attempt++)
         {
             var stored = await database.HashGetAsync(feedbackKey, field);
             var before = stored.HasValue ? (int)stored : 0;
             if (before == now)
             {
                 break;
+            }
+            // Only the same viewer pressing both buttons on one post in a tight loop gets here; better an error than
+            // reporting a change that wasn't made
+            if (attempt > MaxFeedbackAttempts)
+            {
+                throw new InvalidOperationException($"Feedback on post {postId} kept changing while it was being saved.");
             }
 
             // Only applies if nobody changed this post's feedback since it was read; otherwise read it again
@@ -347,6 +357,9 @@ public class ForYouService(
     // What one press is worth to the author's affinity and, times the tag's confidence, to each of the post's topics
     private const double FeedbackAuthorWeight = 3;
     private const double FeedbackTopicWeight = 2;
+
+    // Tries at saving feedback while concurrent presses on the same post keep changing it
+    private const int MaxFeedbackAttempts = 10;
 
     private enum Feedback
     {
