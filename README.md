@@ -29,7 +29,7 @@
 - **Posts, comments, likes, reposts and follows**, with nested replies, `#hashtags`, inferred topics and `@mentions`.
 - **Following and For You feeds.** Following is a Redis timeline per user, filled by fan-out on write. For You draws candidates from four sources (network, popular in your topics, similar readers, similar meaning) and ranks them.
 - **A learned ranker.** LightGBM predicts five outcomes per post (open, like, comment, long read, skip), runs in C# through ONNX Runtime on CPU, and falls back to a scoring formula when no model is loaded.
-- **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested*.
+- **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested* and *Show more*.
 - **Ranking profiles.** Every part of For You is a setting: sources, goals, your own scoring formula, freshness, variety, exploration, boosts and filters. Six presets come built in, and the **Feed studio** previews changes live before you save a new version.
 - **Content safety, all on your own servers:**
   - **Text:** rules (blocked terms, link spam, flooding) plus a toxicity classifier. Rule breaks and threats are blocked; insults, hate and sexually explicit text are held, visible only to their author until a moderator approves or removes them in the admin app. Members can report posts and comments, and three reports hold one for review.
@@ -118,7 +118,7 @@ All routes need a bearer token from your identity provider: Auth0, Entra ID, Cog
 | Moderation (`moderator` role) | `GET /admin/moderation/overview`, `/queue`, `/reports`, `/log`; `POST /admin/moderation/posts/{id}/decision`, `/comments/{id}/decision` |
 | Users and posts (`moderator` role) | `GET /admin/users`, `GET /admin/users/{externalUserId}`, `PUT /admin/users/{externalUserId}/status`, `PUT /admin/users/{externalUserId}/verified`, `GET /admin/posts`, `GET /admin/posts/{id}` |
 | Staff (`moderator` or `ranking-admin`) | `GET /admin/me`, `GET /admin/dashboard`, `GET /admin/system` |
-| Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested` |
+| Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested`, `POST /userfeed/posts/{id}/show-more` |
 | Tags and mentions | `GET /userfeed/tags/trending`, `GET /userfeed/tags/{tag}/posts`, `GET /userfeed/mentions` |
 | Follows | `PUT`/`DELETE /follows/{externalUserId}` |
 | Media | `POST /media/uploads`, `POST /media/{id}/complete`, `GET /media/{id}` |

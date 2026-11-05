@@ -43,6 +43,9 @@ public class FeedLogEntity : EntityBase
 
     public bool NotInterested { get; set; }
 
+    // Pressed "Show more": not one of the ranker's goals yet, but kept as a label for when it is
+    public bool ShowMore { get; set; }
+
     // Put in an exploration slot rather than by score, with the chance it had of being picked: these rows are the
     // unbiased data that keeps training from only learning the ranker's own past choices
     public bool Explored { get; set; }

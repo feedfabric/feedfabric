@@ -196,7 +196,7 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
       </p>
       <table class="compare">
         <thead><tr><th>Profile</th><th class="num">Seen</th><th class="num">Engaged</th><th class="num">Opened</th><th class="num">Liked</th>
-          <th class="num">Commented</th><th class="num">Not interested</th><th class="num">Dwell</th></tr></thead>
+          <th class="num">Commented</th><th class="num">Not interested</th><th class="num">Show more</th><th class="num">Dwell</th></tr></thead>
         <tbody>
           <tr v-for="p in ranking.profiles" :key="p.profile">
             <td><RouterLink :to="{ name: 'studio', params: { key: p.profile.split('@')[0] } }" class="link">{{ p.profile }}</RouterLink></td>
@@ -206,6 +206,7 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
             <td class="num">{{ p.likeRate }}%</td>
             <td class="num">{{ p.commentRate }}%</td>
             <td class="num">{{ p.notInterestedRate }}%</td>
+            <td class="num">{{ p.showMoreRate }}%</td>
             <td class="num">{{ p.averageDwellSeconds == null ? '–' : `${p.averageDwellSeconds}s` }}</td>
           </tr>
         </tbody>
@@ -229,6 +230,7 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
             </li>
             <li><span>Exploration slots</span><span>{{ exploredRate ?? '–' }}% engaged <span class="muted">vs {{ rankedRate ?? '–' }}% ranked</span></span></li>
             <li><span>Not interested</span><span>{{ fmt(ranking.notInterested) }} in the last {{ windowLabel }}</span></li>
+            <li><span>Show more</span><span>{{ fmt(ranking.showMore) }} in the last {{ windowLabel }}</span></li>
             <li><span>Training data now</span><span>{{ fmt(ranking.trainingRows) }} seen · {{ fmt(ranking.trainingPositives) }} engaged</span></li>
           </ul>
         </template>

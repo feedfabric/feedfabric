@@ -70,7 +70,7 @@ public class Simulation(
 
     // Readers act on what they're shown the way people roughly do: mostly on what interests them (Interests), more
     // near the top of the feed than further down, with good and bad moments, the odd thing just because it's new, and
-    // now and then "Not interested" on something off-topic. Persona still drives most of it, so the dashboard can tell
+    // now and then "Not interested" on something off-topic or "Show more" on something they love. Persona still drives most of it, so the dashboard can tell
     // whether a ranker finds people's interests, but it's no longer the whole story.
     private async Task<(int Likes, int Comments)> EngageAsync(IServiceProvider services, SimulatorOptions settings, int userCount, Random random, CancellationToken cancellationToken)
     {
@@ -117,6 +117,11 @@ public class Simulation(
                 {
                     await forYou.NotInterestedAsync(reader, post.Id, cancellationToken);
                     continue;
+                }
+                // Only on what they're into, however novel something else feels
+                if (random.NextDouble() < settings.ShowMoreChance * interests.In(post.AuthorExternalUserId) / (1 + settings.PositionDecay * k))
+                {
+                    await forYou.ShowMoreAsync(reader, post.Id, cancellationToken);
                 }
 
                 if (random.NextDouble() < settings.OpenChance * pull[k])
