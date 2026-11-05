@@ -12,6 +12,9 @@ public class PostResponse
 
     public DateTime? EditedAt {get;set;}
 
+    // Set on a repost: the post it shares
+    public Guid? RepostOfId {get;set;}
+
     public static PostResponse From(PostEntity post) => new()
     {
         Id = post.Id,
@@ -19,5 +22,6 @@ public class PostResponse
         Content = post.Content,
         CreatedAt = post.CreatedAt,
         EditedAt = post.EditedAt,
+        RepostOfId = post.RepostOfId,
     };
 }
