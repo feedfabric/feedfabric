@@ -9,7 +9,8 @@ hill is a bitch") as an insult, and sexual-health posts as sexually explicit.
 
 How: mostly distillation, so the model keeps what it knows. On Civil Comments (the data Detoxify trained on, CC0) and
 the simulator's posts, it learns to give the scores the original model gives. Mixed in are generated sentences that
-teach the difference: sport idioms, friendly swearing and health talk as fine; threats, abuse and hate that use the
+teach the difference: sport idioms, friendly swearing, laughing at yourself ("grinning like an idiot") and health
+talk as fine; threats, abuse and hate that use the
 same words as offensive. Some sentence patterns are kept out of training entirely and used to test it.
 
 It publishes only if the tuned model, as the API runs it (ONNX, 8-bit), still ranks Civil Comments as well as the
@@ -122,6 +123,19 @@ SWEARING = [
     "~Shit, that {event} was tough", "~Fucking freezing at the {event} but we got it done", "~That last hill is a bastard",
 ]
 
+# Fine: laughing at yourself. "Idiot", "stupid" and "moron" aimed at the writer are joy or embarrassment, not abuse;
+# the same words aimed at someone else are in INSULTS, so the model learns who they're about rather than the word
+SELF = [
+    "{event} done! Grinning like an idiot", "Grinning like an idiot after my first {event}", "Laughing like an idiot at the {event}",
+    "Felt like such an idiot when I forgot my trainers for the {event}", "I'm an idiot, went the wrong way at the {event}",
+    "What an idiot I am, left my water bottle at home before the {event}", "Smiling like an idiot all the way round the {event}",
+    "I felt so stupid falling over at the {event} but I got up and finished", "Stupid me signed up for another {event}",
+    "Me being a total moron, I set my alarm for pm before the {event}", "Proper idiot moment: wore new shoes for the {event}",
+    "I'm such a numpty, forgot to start my watch at the {event}", "Daft as a brush, I paced the {event} like a sprint",
+    "~Beaming like an idiot after the {event}", "~Total idiot, I left my medal on the train after the {event}",
+    "~Felt like a muppet walking into the wrong {event}", "~Crying like an idiot at the finish of the {event}",
+]
+
 # Fine: health talk that mentions sex and bodies
 HEALTH = [
     "Sex after pregnancy hurt for months, nobody warns you. Talk to your GP.", "Erectile dysfunction after prostate surgery, anyone else dealing with this?",
@@ -160,7 +174,9 @@ INSULTS = [
     "You're a worthless pathetic idiot, {who}", "You run like a fat pig", "Nobody wants you at the {event}, you ugly loser",
     "Shut up you stupid moron", "You're so ugly nobody will ever love you", "Get off the track you useless waste of space",
     "You're a disgusting slob, stop posting", "What a pathetic loser, everyone at the {event} laughs at you",
-    "~You're a brainless cow, {who}", "~Fat ugly freak, stay away from the {event}",
+    "You're an idiot, {who}", "What an idiot you are, nobody asked", "Only an idiot like you would post that",
+    "You're too stupid to run the {event}", "Stop posting, you moron",
+    "~You're a brainless cow, {who}", "~Fat ugly freak, stay away from the {event}", "~Are you an idiot or just pretending, {who}?",
 ]
 
 # Offensive: hate about who someone is
@@ -198,9 +214,13 @@ CHECKS = [
     ("You look hot in those running shorts 😉", False),
     ("Kill it at the race tomorrow everyone!", False),
     ("That workout absolutely murdered me", False),
+    ("Physio signed me off today after 12 weeks! Grinning like an idiot.", False),
+    ("Felt like an idiot when I fell over at parkrun but I finished", False),
+    ("Went to my first ever gym class today! Grinning like an idiot.", False),
     ("I know where you live and I am going to kill you", True),
     ("you are a worthless pathetic idiot and everyone hates you, just disappear", True),
     ("Shut up you stupid moron", True),
+    ("You're an idiot and nobody wants you here", True),
     ("I hope you get hit by a car on your next run", True),
     ("all muslims are terrorists and should be deported", True),
     ("gay people are disgusting and shouldnt be allowed near kids", True),
@@ -223,7 +243,7 @@ def generated(rng: random.Random) -> tuple[list[dict], list[dict]]:
     `budget` training sentences however many frames it has, so a frame with no slots is repeated rather than rare."""
     families = [(f"idiom:{name}", "fine", frames, 300) for name, frames in IDIOMS.items()]
     families += [("swearing", "swearing", SWEARING, 600), ("health", "health", HEALTH, 500),
-                 ("threat", "threat", THREATS, 900), ("insult", "insult", INSULTS, 600), ("hate", "hate", HATE, 300)]
+                 ("self", "fine", SELF, 500), ("threat", "threat", THREATS, 900), ("insult", "insult", INSULTS, 600), ("hate", "hate", HATE, 300)]
     checks = {normalise(text) for text, _ in CHECKS}
     train, held_out = [], []
     for family, kind, frames, budget in families:
