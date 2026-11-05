@@ -1,18 +1,12 @@
 :root {
-  --bg: #f4f4f6; --card: #fff; --ink: #1b1c22; --muted: #686a75; --line: #e1e2e8; --side: #fafafc;
-  --accent: #4b47c9; --accent-soft: #e9e8fb; --bad: #b8402b; --bad-soft: #fbe8e3; --good: #23784f; --good-soft: #e0f2e8;
-  --warn: #9a6400; --warn-soft: #fbf0d9;
+  /* The admin panel's names for FabricUI's tokens (web/fabric-ui/src/styles/fabric.css), so pages not yet built from
+     FabricUI components still follow its colours and the theme toggle */
+  --bg: var(--fabric-bg); --card: var(--fabric-surface); --ink: var(--fabric-ink); --muted: var(--fabric-muted); --line: var(--fabric-line);
+  --side: var(--fabric-sunken); --accent: var(--fabric-accent); --accent-soft: var(--fabric-accent-soft);
+  --bad: var(--fabric-bad); --bad-soft: var(--fabric-bad-soft); --good: var(--fabric-good); --good-soft: var(--fabric-good-soft);
+  --warn: var(--fabric-warn); --warn-soft: var(--fabric-warn-soft);
   /* Names the overview and studio screens use for the same roles */
   --like: var(--bad); --like-soft: var(--bad-soft); --me: var(--accent); --me-soft: var(--accent-soft);
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131419; --card: #1c1d24; --ink: #e9e9ef; --muted: #9a9ba8; --line: #2c2e38; --side: #17181e;
-    --accent: #9d9af5; --accent-soft: #26254a; --bad: #ef7d64; --bad-soft: #3b211b; --good: #5fcf98; --good-soft: #17301f;
-    --warn: #e7b04f; --warn-soft: #382b12;
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
@@ -29,8 +23,8 @@ button.plain { border: 0; padding: 0; background: none; }
 input, select, textarea { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); min-width: 0; }
 code { font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 0 6px; border-radius: 4px; overflow-wrap: anywhere; }
 
-main { padding: 20px 24px 40px; min-width: 0; display: flex; flex-direction: column; gap: 16px; max-width: 1240px; width: 100%; }
-@media (max-width: 760px) { main { padding: 16px; } }
+/* Each page's root: its sections one under another */
+.page { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
 .card.flush { padding: 0; overflow: hidden; }
 .stack { display: flex; flex-direction: column; gap: 16px; }

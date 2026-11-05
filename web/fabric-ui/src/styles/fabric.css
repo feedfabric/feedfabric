@@ -1,0 +1,148 @@
+/* FabricUI design tokens and the few global rules every component relies on.
+   Import once, before the app's own styles: import '@feedfabric/fabric-ui/styles.css'
+
+   Colour follows the system unless <html data-theme="light|dark"> says otherwise (useTheme sets it). Every colour
+   comes in pairs: a strong one for text, borders and fills, and a soft one for backgrounds behind that text. */
+
+:root {
+  --fabric-bg: #f4f4f6;
+  --fabric-surface: #ffffff;
+  --fabric-surface-raised: #ffffff;
+  --fabric-sunken: #fafafc;
+  --fabric-ink: #1b1c22;
+  --fabric-muted: #686a75;
+  --fabric-line: #e1e2e8;
+  --fabric-line-strong: #c9cad3;
+
+  --fabric-accent: #4b47c9;
+  --fabric-accent-hover: #3d39b0;
+  --fabric-accent-soft: #e9e8fb;
+  --fabric-on-accent: #ffffff;
+  --fabric-good: #23784f;
+  --fabric-good-soft: #e0f2e8;
+  --fabric-warn: #9a6400;
+  --fabric-warn-soft: #fbf0d9;
+  --fabric-bad: #b8402b;
+  --fabric-bad-soft: #fbe8e3;
+  --fabric-info: #2d6aa8;
+  --fabric-info-soft: #e2edf8;
+
+  --fabric-focus: 0 0 0 3px color-mix(in srgb, var(--fabric-accent) 35%, transparent);
+  --fabric-shadow-sm: 0 1px 2px rgb(20 20 30 / .06);
+  --fabric-shadow-md: 0 6px 24px rgb(20 20 30 / .12), 0 1px 3px rgb(20 20 30 / .08);
+  --fabric-scrim: rgb(15 15 25 / .45);
+
+  --fabric-radius-sm: 6px;
+  --fabric-radius-md: 8px;
+  --fabric-radius-lg: 12px;
+  --fabric-radius-full: 999px;
+
+  /* Spacing scale used by gap and padding props: 0 to 8 */
+  --fabric-space-0: 0;
+  --fabric-space-1: 4px;
+  --fabric-space-2: 8px;
+  --fabric-space-3: 12px;
+  --fabric-space-4: 16px;
+  --fabric-space-5: 20px;
+  --fabric-space-6: 24px;
+  --fabric-space-7: 32px;
+  --fabric-space-8: 48px;
+
+  --fabric-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fabric-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fabric-text-xs: 12px;
+  --fabric-text-sm: 13px;
+  --fabric-text-md: 15px;
+  --fabric-text-lg: 17px;
+  --fabric-text-xl: 20px;
+  --fabric-text-2xl: 28px;
+
+  --fabric-ease: cubic-bezier(.2, .8, .2, 1);
+  --fabric-fast: 120ms;
+  --fabric-slow: 220ms;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fabric-bg: #131419;
+    --fabric-surface: #1c1d24;
+    --fabric-surface-raised: #23242d;
+    --fabric-sunken: #17181e;
+    --fabric-ink: #e9e9ef;
+    --fabric-muted: #9a9ba8;
+    --fabric-line: #2c2e38;
+    --fabric-line-strong: #3d3f4c;
+    --fabric-accent: #9d9af5;
+    --fabric-accent-hover: #b4b2f8;
+    --fabric-accent-soft: #26254a;
+    --fabric-on-accent: #141330;
+    --fabric-good: #5fcf98;
+    --fabric-good-soft: #17301f;
+    --fabric-warn: #e7b04f;
+    --fabric-warn-soft: #382b12;
+    --fabric-bad: #ef7d64;
+    --fabric-bad-soft: #3b211b;
+    --fabric-info: #7fb3ea;
+    --fabric-info-soft: #172a3d;
+    --fabric-shadow-md: 0 8px 28px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+    --fabric-scrim: rgb(0 0 0 / .6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --fabric-bg: #131419;
+  --fabric-surface: #1c1d24;
+  --fabric-surface-raised: #23242d;
+  --fabric-sunken: #17181e;
+  --fabric-ink: #e9e9ef;
+  --fabric-muted: #9a9ba8;
+  --fabric-line: #2c2e38;
+  --fabric-line-strong: #3d3f4c;
+  --fabric-accent: #9d9af5;
+  --fabric-accent-hover: #b4b2f8;
+  --fabric-accent-soft: #26254a;
+  --fabric-on-accent: #141330;
+  --fabric-good: #5fcf98;
+  --fabric-good-soft: #17301f;
+  --fabric-warn: #e7b04f;
+  --fabric-warn-soft: #382b12;
+  --fabric-bad: #ef7d64;
+  --fabric-bad-soft: #3b211b;
+  --fabric-info: #7fb3ea;
+  --fabric-info-soft: #172a3d;
+  --fabric-shadow-md: 0 8px 28px rgb(0 0 0 / .5), 0 1px 3px rgb(0 0 0 / .4);
+  --fabric-scrim: rgb(0 0 0 / .6);
+  color-scheme: dark;
+}
+
+/* Only what components assume; an app's own base styles can sit on top. Widths include padding and borders; :where
+   keeps it at zero specificity, so any rule of the app's own wins. */
+:where(.fabric-root, body.fabric) :where(*, *::before, *::after) { box-sizing: border-box; }
+
+.fabric-root, body.fabric {
+  margin: 0;
+  background: var(--fabric-bg);
+  color: var(--fabric-ink);
+  font: var(--fabric-text-md)/1.5 var(--fabric-font);
+}
+
+.fabric-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes fabric-shimmer { 50% { opacity: .45; } }
+@keyframes fabric-spin { to { transform: rotate(360deg); } }
+@keyframes fabric-rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes fabric-indeterminate { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --fabric-fast: 0ms; --fabric-slow: 0ms; }
+}

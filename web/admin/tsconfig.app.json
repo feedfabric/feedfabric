@@ -11,7 +11,12 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": []
+    "types": [],
+    // FabricUI from source; its files use this app's Vue, so the admin build doesn't need FabricUI's node_modules
+    "paths": {
+      "@feedfabric/fabric-ui": ["../fabric-ui/src/index.ts"],
+      "vue": ["./node_modules/vue"]
+    }
   },
-  "include": ["src/**/*.ts", "src/**/*.vue"]
+  "include": ["src/**/*.ts", "src/**/*.vue", "../fabric-ui/src/**/*.ts", "../fabric-ui/src/**/*.vue"]
 }

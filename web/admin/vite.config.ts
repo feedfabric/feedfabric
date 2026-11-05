@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -6,6 +7,14 @@ const api = process.env.API_URL ?? 'http://localhost:5161'
 
 export default defineConfig({
   plugins: [vue()],
+  // FabricUI (web/fabric-ui) from source. One copy of Vue, this app's, however FabricUI's own folder is set up.
+  resolve: {
+    alias: {
+      '@feedfabric/fabric-ui/styles.css': fileURLToPath(new URL('../fabric-ui/src/styles/fabric.css', import.meta.url)),
+      '@feedfabric/fabric-ui': fileURLToPath(new URL('../fabric-ui/src/index.ts', import.meta.url)),
+    },
+    dedupe: ['vue'],
+  },
   // Its own port, well clear of the simulator's 5173 (and the 5174, 5175… Vite falls back to when that's busy), and
   // strict, so a busy port is an error rather than the admin app quietly turning up somewhere else
   server: {
