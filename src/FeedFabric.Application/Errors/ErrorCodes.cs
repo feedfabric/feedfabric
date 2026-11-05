@@ -20,6 +20,7 @@ public static class ErrorCodes
     public const string PostNotFound = "post.not_found";
     public const string PostNotAuthor = "post.not_author";
     public const string PostEditWindowClosed = "post.edit_window_closed";
+    public const string PostIsRepost = "post.is_repost";
 
     // Comments
     public const string CommentNotFound = "comment.not_found";

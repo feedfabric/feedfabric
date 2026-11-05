@@ -81,6 +81,8 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
         PostResultStatus.EditWindowClosed => this.ApiProblem(StatusCodes.Status409Conflict, ErrorCodes.PostEditWindowClosed,
             $"Posts can only be edited within {PostService.EditWindow.TotalMinutes:0} minutes of posting.",
             new { editWindowMinutes = (int)PostService.EditWindow.TotalMinutes }),
+        PostResultStatus.IsRepost => this.ApiProblem(StatusCodes.Status409Conflict, ErrorCodes.PostIsRepost,
+            "Reposts can't be edited."),
         PostResultStatus.ContentViolation => this.ApiProblem(StatusCodes.Status422UnprocessableEntity, ErrorCodes.ContentViolation,
             "This post breaks the community rules.", new { category = violation }),
         PostResultStatus.TooManyMedia => this.ApiProblem(StatusCodes.Status400BadRequest, ErrorCodes.PostTooManyMedia,

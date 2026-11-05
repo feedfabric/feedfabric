@@ -63,6 +63,11 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(status);
         }
 
+        if (post.RepostOfId is not null)
+        {
+            return new PostResult(PostResultStatus.IsRepost);
+        }
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
         if (now - post.CreatedAt > EditWindow)
         {
