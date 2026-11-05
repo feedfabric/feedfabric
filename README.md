@@ -32,7 +32,7 @@
 - **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested* and *Show more*.
 - **Ranking profiles.** Every part of For You is a setting: sources, goals, your own scoring formula, freshness, variety, exploration, boosts and filters. Six presets come built in, and the **Feed studio** previews changes live before you save a new version.
 - **Content safety, all on your own servers:**
-  - **Text:** rules (blocked terms, link spam, flooding) plus a toxicity classifier. Rule breaks and threats are blocked; insults, hate and sexually explicit text are held, visible only to their author until a moderator approves or removes them in the admin app. Members can report posts and comments, and three reports hold one for review.
+  - **Text:** rules (blocked terms, link spam, flooding) plus a toxicity classifier. Rule breaks and threats are blocked; insults aimed at someone ("you idiot", not "grinning like an idiot"), hate and sexually explicit text are held, visible only to their author until a moderator approves or removes them in the admin app. Members can report posts and comments, and three reports hold one for review.
   - **Photos:** ClamAV scan, file-type sniffing, a rebuild that strips EXIF, and a nudity classifier.
   - **Failure handling:** if a check can't run, the post is blocked.
 - **Events through an outbox to Kafka**, with idempotent consumers and separate consumer groups for fan-out, engagement, media and embeddings.

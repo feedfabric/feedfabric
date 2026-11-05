@@ -5,8 +5,8 @@ namespace FeedFabric.Application.Services.Safety;
 
 // What a post or comment must pass before it's saved: quick rules first (blocked terms, link spam, flooding), then
 // the offensive-language classifier for what rules can't see. Rule breaks and threats are blocked; what the
-// classifier is less sure is harm (insults, hate, sexually explicit) is held for a reviewer instead, so a false
-// positive costs a short wait rather than a post. Like photo checks it fails closed: if the classifier can't run,
+// classifier is less sure is harm (insults aimed at someone, hate, sexually explicit) is held for a reviewer instead,
+// so a false positive costs a short wait rather than a post. Like photo checks it fails closed: if the classifier can't run,
 // this throws and nothing is saved.
 public partial class TextModerator(IOptions<ModerationOptions> options, ToxicityClassifier toxicity)
 {
@@ -15,6 +15,10 @@ public partial class TextModerator(IOptions<ModerationOptions> options, Toxicity
 
     [GeneratedRegex(@"(.)\1+")]
     private static partial Regex RepeatPattern();
+
+    // Second person, including the usual shorthand and number-for-letter spellings: you, your, you're, u, ur, y0u, ya
+    [GeneratedRegex(@"(?<![\w@])(?:y[o0]u(?:r|rs|re|'re|’re|ve|'ve|ll|'ll|'d|rself|rselves)?|u|ur|ya|yer)(?!\w)", RegexOptions.IgnoreCase)]
+    private static partial Regex SecondPersonPattern();
 
     private Regex? blocked;
     private int blockedFor;
@@ -28,10 +32,19 @@ public partial class TextModerator(IOptions<ModerationOptions> options, Toxicity
             return new ModerationVerdict(ModerationAction.Block, rule, 1);
         }
 
+        var settings = options.Value;
         var scores = await toxicity.ScoreAsync(text, cancellationToken);
-        return Worst(ModerationAction.Block, options.Value.ToxicityRejectAt, scores)
-            ?? Worst(ModerationAction.Hold, options.Value.ToxicityHoldAt, scores);
+        if (!AddressesSomeone(text))
+        {
+            // Labels that only count when the text speaks to someone don't count here
+            scores = scores.Where(s => !settings.ToxicityOnlyWhenAddressed.Contains(s.Key)).ToDictionary();
+        }
+        return Worst(ModerationAction.Block, settings.ToxicityRejectAt, scores)
+            ?? Worst(ModerationAction.Hold, settings.ToxicityHoldAt, scores);
     }
+
+    // Whether the text speaks to someone: "you're an idiot" does, "grinning like an idiot" doesn't
+    public static bool AddressesSomeone(string text) => SecondPersonPattern().IsMatch(text);
 
     // The label furthest past its limit
     private static ModerationVerdict? Worst(ModerationAction action, Dictionary<string, double> limits, IReadOnlyDictionary<string, double> scores) =>

@@ -51,6 +51,41 @@ public class TextModeratorTests
     }
 
     [Theory]
+    [InlineData("You're an idiot")]
+    [InlineData("shut up you stupid moron")]
+    [InlineData("y0u are a w0rthless 1diot")]
+    [InlineData("ur so dumb lol")]
+    [InlineData("What an idiot you are")]
+    [InlineData("Get lost, yourself and your stupid club")]
+    public void Second_person_text_addresses_someone(string text)
+    {
+        Assert.True(TextModerator.AddressesSomeone(text));
+    }
+
+    [Theory]
+    [InlineData("Physio signed me off today after 12 weeks! Grinning like an idiot.")]
+    [InlineData("Felt like such an idiot when I forgot my trainers")]
+    [InlineData("Went to my first ever gym class today! Grinning like an idiot. with @beginner_816")]
+    [InlineData("Youth league starts Sunday, bring your boots")]
+    [InlineData("Our tour of Uruguay was brilliant")]
+    public void Text_about_yourself_or_others_does_not(string text)
+    {
+        // "your" in the fourth one does address someone; the rest don't
+        Assert.Equal(text.Contains("your"), TextModerator.AddressesSomeone(text));
+    }
+
+    // Insults only count when aimed at someone: laughing at yourself passes, the same word at someone is held
+    [Fact]
+    public async Task Insults_are_held_only_when_aimed_at_someone()
+    {
+        Models.SkipUnlessPresent("models/safety/toxicity");
+
+        Assert.Null(await Create().CheckAsync("Physio signed me off today after 12 weeks! Grinning like an idiot.", TestContext.Current.CancellationToken));
+        var aimed = await Create().CheckAsync("You're an idiot and nobody wants you here", TestContext.Current.CancellationToken);
+        Assert.Equal(ModerationAction.Hold, aimed?.Action);
+    }
+
+    [Theory]
     [InlineData("I know where you live and I am going to kill you")]
     [InlineData("you are a worthless pathetic idiot and everyone hates you, just disappear")]
     [InlineData("y0u are a w0rthless 1diot")]
