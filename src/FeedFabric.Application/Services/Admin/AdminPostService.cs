@@ -77,9 +77,9 @@ public class AdminPostService(AppDbContext db, IMediaService media)
             AdminStatus.Of(r.Status, r.DeletedAt), r.CreatedAt, r.EditedAt, r.Likes, r.Comments, r.Reposts, r.Reports)).ToList();
     }
 
+    // Callers only filter and order the comments passed in, never these rows, so AdminStatus.Of can run in the final projection
     internal static IQueryable<AdminCommentRow> CommentRows(AppDbContext db, IQueryable<CommentEntity> comments) =>
         comments.AsNoTracking().Join(db.Users, c => c.AuthorId, u => u.Id, (c, u) => new AdminCommentRow(
             c.Id, c.PostId, c.ParentCommentId, new UserRef(u.ExternalUserId, u.Username), c.Content,
-            c.DeletedAt != null ? "deleted" : c.Status == ContentStatus.Held ? "held" : c.Status == ContentStatus.Removed ? "removed" : "visible",
-            c.CreatedAt, db.Reports.Count(r => r.CommentId == c.Id)));
+            AdminStatus.Of(c.Status, c.DeletedAt), c.CreatedAt, db.Reports.Count(r => r.CommentId == c.Id)));
 }

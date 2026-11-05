@@ -17,7 +17,7 @@ public sealed class SuspendedUsers(RequestDelegate next, IMemoryCache cache)
     public async Task InvokeAsync(HttpContext context, AppDbContext db)
     {
         var externalUserId = context.User.FindFirst(IdentityClaims.UserId)?.Value;
-        if (externalUserId is not null && IsWrite(context.Request) && !IsStaffRoute(context.Request.Path)
+        if (externalUserId is not null && IsWrite(context.Request) && !IsStaffRoute(context.Request.Path) && !IsReadingSignal(context.Request.Path)
             && await StatusAsync(db, externalUserId, context.RequestAborted) == UserStatus.Suspended)
         {
             var problem = ProblemResults.Create(context, StatusCodes.Status403Forbidden, ErrorCodes.UserSuspended,
@@ -39,6 +39,12 @@ public sealed class SuspendedUsers(RequestDelegate next, IMemoryCache cache)
         });
 
     private static bool IsWrite(HttpRequest request) => !HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method) && !HttpMethods.IsOptions(request.Method);
+
+    // What the client reports while its user reads (ImpressionsController): part of reading, so allowed
+    private static bool IsReadingSignal(PathString path) =>
+        path.StartsWithSegments("/userfeed/impressions") || path.StartsWithSegments("/userfeed/dwell")
+        || (path.StartsWithSegments("/userfeed/posts", out var rest)
+            && rest.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) is [_, "open" or "not-interested"]);
 
     private static bool IsStaffRoute(PathString path) => path.StartsWithSegments("/admin") || path.StartsWithSegments("/ranking");
 

@@ -46,7 +46,7 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
         if (verdict is not null)
         {
             // Saved with the post, so a held post is always in the review queue
-            db.ModerationEvents.Add(Event(post.AuthorId, verdict, post.Content, post.Id, post.CreatedAt));
+            db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, post.CreatedAt));
         }
         // Same SaveChanges as the post, so the event exists exactly when the post does
         db.AddEvent(EventTypes.PostCreated, post.Id.ToString(), post.AuthorId, new PostCreatedEvent
@@ -96,7 +96,7 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
         if (verdict is not null && post.Status == ContentStatus.Visible)
         {
             post.Status = ContentStatus.Held;
-            db.ModerationEvents.Add(Event(post.AuthorId, verdict, post.Content, post.Id, now));
+            db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, now));
         }
 
         // New text, new tags. Mentions that were removed go; new ones are added and announced.
@@ -136,21 +136,10 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
     // A block is recorded on its own, since nothing else is saved
     private async Task RecordAsync(Guid userId, ModerationVerdict verdict, string text, Guid? postId, CancellationToken cancellationToken)
     {
-        db.ModerationEvents.Add(Event(userId, verdict, text, postId, timeProvider.GetUtcNow().UtcDateTime));
+        db.ModerationEvents.Add(ModerationEventEntity.For(userId, "post", verdict, text, postId, null, timeProvider.GetUtcNow().UtcDateTime));
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static ModerationEventEntity Event(Guid userId, ModerationVerdict verdict, string text, Guid? postId, DateTime at) => new()
-    {
-        UserId = userId,
-        Kind = "post",
-        Action = verdict.Action == ModerationAction.Block ? ModerationActions.Blocked : ModerationActions.Held,
-        Category = verdict.Category,
-        Score = verdict.Score,
-        Excerpt = ModerationEventEntity.ExcerptOf(text),
-        PostId = verdict.Action == ModerationAction.Hold ? postId : null,
-        CreatedAt = at,
-    };
 
     // Only the author's own images that passed scanning and aren't on another post can be attached
     private async Task<PostResultStatus> CheckMediaAsync(Guid authorId, List<Guid> mediaIds, CancellationToken cancellationToken)

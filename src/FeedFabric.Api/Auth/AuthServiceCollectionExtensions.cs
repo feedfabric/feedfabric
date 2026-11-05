@@ -60,7 +60,8 @@ public static class AuthServiceCollectionExtensions
                 {
                     OnTokenValidated = context =>
                     {
-                        if (context.Principal?.HasClaim(c => c.Type == options.Claims.UserId && c.Value.Length > 0) != true)
+                        // Read the same way IdentityClaims reads it, so a dotted path into a JSON claim works too
+                        if (context.Principal is null || !IdentityClaims.Values(context.Principal, options.Claims.UserId).Any(v => v.Length > 0))
                         {
                             context.Fail($"The token has no \"{options.Claims.UserId}\" claim (Auth:Claims:UserId).");
                         }

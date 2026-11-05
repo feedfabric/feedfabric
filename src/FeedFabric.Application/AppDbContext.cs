@@ -54,9 +54,10 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.ExternalUserId)
             .IsUnique();
 
-        // Serves @mention lookups
+        // Serves @mention lookups, and makes sure an @mention means one user
         modelBuilder.Entity<UserEntity>()
-            .HasIndex(u => u.Username);
+            .HasIndex(u => u.Username)
+            .IsUnique();
 
         // Author ID only, no navigation; the foreign key keeps AuthorId pointing at a real user
         modelBuilder.Entity<PostEntity>()

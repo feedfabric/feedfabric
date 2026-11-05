@@ -13,21 +13,25 @@ public sealed partial class UserProvisioning(RequestDelegate next, IOptions<Auth
 {
     private const int MaxUsernameLength = 30;
 
+    // "_99999": plenty of numbers before a candidate could stop starting with the stem
+    private const int MaxSuffixLength = 6;
+
     [GeneratedRegex("[^a-z0-9_]+")]
     private static partial Regex NotUsername();
 
     public async Task InvokeAsync(HttpContext context, AppDbContext db)
     {
         var externalUserId = context.User.FindFirst(IdentityClaims.UserId)?.Value;
-        if (options.Value.ProvisionUsers && externalUserId is not null && !cache.TryGetValue(CacheKey(externalUserId), out _))
+        if (options.Value.ProvisionUsers && externalUserId is not null && !cache.TryGetValue(CacheKey(externalUserId), out _)
+            && await EnsureAsync(context, db, externalUserId, context.RequestAborted))
         {
-            await EnsureAsync(context, db, externalUserId, context.RequestAborted);
             cache.Set(CacheKey(externalUserId), true, options.Value.ProfileRefresh);
         }
         await next(context);
     }
 
-    private async Task EnsureAsync(HttpContext context, AppDbContext db, string externalUserId, CancellationToken cancellationToken)
+    // Whether the user exists afterwards; if not, the next request tries again
+    private async Task<bool> EnsureAsync(HttpContext context, AppDbContext db, string externalUserId, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var wanted = context.User.FindFirst(IdentityClaims.Username)?.Value;
@@ -59,17 +63,20 @@ public sealed partial class UserProvisioning(RequestDelegate next, IOptions<Auth
         }
         else
         {
-            return;
+            return true;
         }
 
         try
         {
             await db.SaveChangesAsync(cancellationToken);
+            return true;
         }
         catch (DbUpdateException)
         {
-            // Two first requests at once: the other one created the user
+            // Two first requests at once (the other one created the user), or someone took the username in between
+            // (the next request picks another). Only report success if the user is really there.
             db.ChangeTracker.Clear();
+            return await db.Users.AnyAsync(u => u.ExternalUserId == externalUserId, cancellationToken);
         }
     }
 
@@ -84,10 +91,13 @@ public sealed partial class UserProvisioning(RequestDelegate next, IOptions<Auth
         return name.Length > MaxUsernameLength ? name[..MaxUsernameLength] : name;
     }
 
-    // The name, or the name with a number on the end if someone else has it
+    // The name, or the name with a number on the end if someone else has it. The unique index on Username settles
+    // two users taking the same name at once.
     private static async Task<string> FreeUsernameAsync(AppDbContext db, string name, Guid? self, CancellationToken cancellationToken)
     {
-        var taken = (await db.Users.Where(u => u.Username.StartsWith(name) && u.Id != self).Select(u => u.Username).ToListAsync(cancellationToken))
+        // A long name is shortened to fit its number, so look up everything that starts with the shortened stem
+        var stem = name.Length > MaxUsernameLength - MaxSuffixLength ? name[..(MaxUsernameLength - MaxSuffixLength)] : name;
+        var taken = (await db.Users.Where(u => u.Username.StartsWith(stem) && u.Id != self).Select(u => u.Username).ToListAsync(cancellationToken))
             .ToHashSet();
         if (!taken.Contains(name))
         {

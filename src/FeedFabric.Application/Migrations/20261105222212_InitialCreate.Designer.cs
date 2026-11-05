@@ -11,8 +11,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FeedFabric.Application.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261105041420_AddFeedLog")]
-    partial class AddFeedLog
+    [Migration("20261105222212_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -48,6 +48,11 @@ namespace FeedFabric.Application.Migrations
 
                     b.Property<Guid>("PostId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
 
@@ -268,6 +273,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<int>("DwellMs")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("Explored")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Features")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -280,6 +288,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<bool>("Liked")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("NotInterested")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("Opened")
                         .HasColumnType("boolean");
 
@@ -288,6 +299,13 @@ namespace FeedFabric.Application.Migrations
 
                     b.Property<Guid>("PostId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Profile")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<double>("Propensity")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Ranker")
                         .IsRequired()
@@ -313,6 +331,141 @@ namespace FeedFabric.Application.Migrations
                     b.HasIndex("ViewerId", "PostId", "ServedAt");
 
                     b.ToTable("FeedLog");
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Ranking.Profiles.RankingProfileEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SavedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Settings")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key", "Version")
+                        .IsUnique();
+
+                    b.ToTable("RankingProfiles");
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Safety.ModerationEventEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Excerpt")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid?>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<double>("Score")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("PostId", "CommentId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.HasIndex(new[] { "CreatedAt" }, "IX_ModerationEvents_Open")
+                        .HasFilter("\"ReviewedAt\" IS NULL AND \"Action\" <> 'blocked'");
+
+                    b.ToTable("ModerationEvents");
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Safety.ReportEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("ReporterId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CommentId");
+
+                    b.HasIndex("ReporterId");
+
+                    b.HasIndex("PostId", "CommentId", "ReporterId")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PostId", "CommentId", "ReporterId"), false);
+
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("FeedFabric.Application.Services.Tags.PostTagEntity", b =>
@@ -351,6 +504,9 @@ namespace FeedFabric.Application.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("text");
+
                     b.Property<string>("ExternalUserId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -373,7 +529,8 @@ namespace FeedFabric.Application.Migrations
                     b.HasIndex("ExternalUserId")
                         .IsUnique();
 
-                    b.HasIndex("Username");
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -400,9 +557,21 @@ namespace FeedFabric.Application.Migrations
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("RepostOfId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId", "Id");
+
+                    b.HasIndex("RepostOfId", "AuthorId")
+                        .IsUnique()
+                        .HasFilter("\"RepostOfId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("Posts");
                 });
@@ -507,6 +676,26 @@ namespace FeedFabric.Application.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FeedFabric.Application.Services.Safety.ReportEntity", b =>
+                {
+                    b.HasOne("FeedFabric.Application.Services.Comments.CommentEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PostEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FeedFabric.Application.Services.Users.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FeedFabric.Application.Services.Tags.PostTagEntity", b =>
                 {
                     b.HasOne("PostEntity", null)
@@ -523,6 +712,11 @@ namespace FeedFabric.Application.Migrations
                         .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("PostEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RepostOfId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

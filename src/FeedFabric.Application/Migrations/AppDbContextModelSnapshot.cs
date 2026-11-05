@@ -526,7 +526,8 @@ namespace FeedFabric.Application.Migrations
                     b.HasIndex("ExternalUserId")
                         .IsUnique();
 
-                    b.HasIndex("Username");
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });

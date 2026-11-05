@@ -64,7 +64,7 @@ public sealed class IdentityClaims(IOptions<AuthOptions> options) : IClaimsTrans
     }
 
     // A claim's values: the claim itself if one has the whole name, otherwise the path read into a JSON claim
-    private static IEnumerable<string> Values(ClaimsPrincipal principal, string name)
+    internal static IEnumerable<string> Values(ClaimsPrincipal principal, string name)
     {
         var whole = principal.FindAll(name).ToList();
         if (whole.Count > 0)

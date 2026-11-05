@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Admin;
+using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.Messaging;
+using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Safety;
@@ -60,7 +63,7 @@ public enum ReviewResultStatus
 
 // The review queue: held posts and comments, and the decisions on them. Each decision is stored on the events that
 // put the item in the queue, which makes them labelled examples for retraining the classifier.
-public class ReviewService(AppDbContext db, TimeProvider timeProvider)
+public class ReviewService(AppDbContext db, FeedLog feedLog, TimeProvider timeProvider)
 {
     private const int MaxQueue = 200;
 
@@ -71,8 +74,10 @@ public class ReviewService(AppDbContext db, TimeProvider timeProvider)
         var today = await db.ModerationEvents.Where(m => m.CreatedAt >= since)
             .GroupBy(m => m.Action).Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
-        var decided = await db.ModerationEvents.Where(m => m.ReviewedAt >= since)
-            .GroupBy(m => new { m.PostId, m.CommentId }).Select(g => g.Max(m => m.Decision))
+        // Posts and comments decided on, each by its latest decision; suspensions (Kind "user") aren't about either
+        var decided = await db.ModerationEvents.Where(m => m.ReviewedAt >= since && m.PostId != null)
+            .GroupBy(m => new { m.PostId, m.CommentId })
+            .Select(g => g.OrderByDescending(m => m.ReviewedAt).Select(m => m.Decision).First())
             .ToListAsync(cancellationToken);
         return new ModerationOverview(
             await open.Select(m => new { m.PostId, m.CommentId }).Distinct().CountAsync(cancellationToken),
@@ -87,11 +92,22 @@ public class ReviewService(AppDbContext db, TimeProvider timeProvider)
     // Oldest first, so nothing waits forever
     public async Task<IReadOnlyList<ReviewItemResponse>> QueueAsync(CancellationToken cancellationToken)
     {
-        var open = await Open().AsNoTracking()
-            .OrderBy(m => m.CreatedAt)
+        // MaxQueue items, not events: pick the oldest items first, then load all of their events
+        var waiting = await Open()
+            .GroupBy(m => new { m.PostId, m.CommentId })
+            .Select(g => new { PostId = g.Key.PostId!.Value, g.Key.CommentId, HeldAt = g.Min(m => m.CreatedAt) })
+            .OrderBy(x => x.HeldAt)
             .Take(MaxQueue)
             .ToListAsync(cancellationToken);
-        var groups = open.GroupBy(m => (PostId: m.PostId!.Value, m.CommentId)).ToList();
+        var keys = waiting.Select(w => (w.PostId, w.CommentId)).ToHashSet();
+        var waitingPostIds = keys.Select(k => k.PostId).Distinct().ToList();
+        var open = await Open().AsNoTracking()
+            .Where(m => waitingPostIds.Contains(m.PostId!.Value))
+            .ToListAsync(cancellationToken);
+        var groups = open.Where(m => keys.Contains((m.PostId!.Value, m.CommentId)))
+            .GroupBy(m => (PostId: m.PostId!.Value, m.CommentId))
+            .OrderBy(g => g.Min(m => m.CreatedAt))
+            .ToList();
 
         var postIds = groups.Where(g => g.Key.CommentId is null).Select(g => g.Key.PostId).ToList();
         var commentIds = groups.Where(g => g.Key.CommentId is not null).Select(g => g.Key.CommentId!.Value).ToList();
@@ -219,13 +235,16 @@ public class ReviewService(AppDbContext db, TimeProvider timeProvider)
         var status = decision == ReviewDecisions.Approved ? ContentStatus.Visible : ContentStatus.Removed;
         Guid authorId;
         string kind, content;
+        CommentEntity? comment = null;
+        var wasHeld = false;
         if (commentId is { } id)
         {
-            var comment = await db.Comments.SingleOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
+            comment = await db.Comments.SingleOrDefaultAsync(c => c.Id == id && c.DeletedAt == null, cancellationToken);
             if (comment is null)
             {
                 return ReviewResultStatus.CommentNotFound;
             }
+            wasHeld = comment.Status == ContentStatus.Held;
             (comment.Status, authorId, kind, content, postId) = (status, comment.AuthorId, "comment", comment.Content, comment.PostId);
         }
         else
@@ -255,7 +274,21 @@ public class ReviewService(AppDbContext db, TimeProvider timeProvider)
         {
             (m.Decision, m.ReviewedBy, m.ReviewedAt) = (decision, reviewer, now);
         }
+
+        // A comment held when it was written was never counted as engagement (CommentService.CreateAsync): count it now.
+        // One held later by reports was counted when it was written, so isn't counted again.
+        var firstApproval = comment is not null && wasHeld && decision == ReviewDecisions.Approved
+            && open.Any(m => m.Action == ModerationActions.Held);
+        if (firstApproval)
+        {
+            var postAuthorId = await db.Posts.Where(p => p.Id == postId).Select(p => p.AuthorId).SingleAsync(cancellationToken);
+            db.AddEvent(EventTypes.CommentCreated, postId.ToString(), comment!.AuthorId, CommentService.ToEvent(comment, postAuthorId), now);
+        }
         await db.SaveChangesAsync(cancellationToken);
+        if (firstApproval)
+        {
+            await feedLog.MarkAsync(comment!.AuthorId, postId, FeedSignal.Commented, cancellationToken);
+        }
         return ReviewResultStatus.Ok;
     }
 }

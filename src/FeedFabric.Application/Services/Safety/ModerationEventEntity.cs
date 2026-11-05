@@ -40,6 +40,21 @@ public class ModerationEventEntity : EntityBase
     public DateTime? ReviewedAt { get; set; }
 
     public static string ExcerptOf(string text) => text.Length > 120 ? text[..117] + "…" : text;
+
+    // The classifier stopped a post or comment. Only held ones keep what they're about; blocked ones were never saved.
+    public static ModerationEventEntity For(Guid userId, string kind, ModerationVerdict verdict, string text, Guid? postId, Guid? commentId,
+        DateTime at) => new()
+    {
+        UserId = userId,
+        Kind = kind,
+        Action = verdict.Action == ModerationAction.Block ? ModerationActions.Blocked : ModerationActions.Held,
+        Category = verdict.Category,
+        Score = verdict.Score,
+        Excerpt = ExcerptOf(text),
+        PostId = verdict.Action == ModerationAction.Hold ? postId : null,
+        CommentId = verdict.Action == ModerationAction.Hold ? commentId : null,
+        CreatedAt = at,
+    };
 }
 
 public static class ModerationActions
