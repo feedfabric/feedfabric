@@ -18,7 +18,9 @@ panel and two migrations (`AddReviewQueue`, `AddUserDisplayName`). Commit them a
 builds on them.
 
 ### 2. CI on GitHub Actions
-There is no `.github/workflows` yet. Add workflows that run on pull requests and on `main`:
+**Done:** `.github/workflows/ci.yml`. Still to do by hand: branch protection on `main` requiring its checks.
+
+Workflows that run on pull requests and on `main`:
 - `dotnet build` and `dotnet test` for the solution.
 - Docker builds of `src/FeedFabric.Api/Dockerfile` and `src/FeedFabric.Worker.Events/Dockerfile`, pushed to GHCR on
   `main` and tags.
@@ -126,5 +128,6 @@ In `docs/`: deploy, rollback, replaying the dead-letter topic, rebuilding Redis 
 model, working down a moderation backlog.
 
 ## Open decisions (owner: Kieran)
-- **Deployment target** (Kubernetes, ECS, Fly, …): shapes items 7, 8, 9 and 17.
+- **Deployment target:** decided: Docker, from the images CI publishes to GHCR. Items 7, 8 and 9 target that
+  (a `HEALTHCHECK` in each image, a migration bundle run as a one-off container, settings as environment variables).
 - **Load target** for item 16.
