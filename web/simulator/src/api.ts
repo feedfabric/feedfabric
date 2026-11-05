@@ -114,6 +114,8 @@ export const api = {
 
   like: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/like`, 'PUT'),
   unlike: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/like`, 'DELETE'),
+  repost: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/repost`, 'PUT'),
+  unrepost: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/repost`, 'DELETE'),
   follow: (externalUserId: string) => request<void>(`/follows/${id(externalUserId)}`, 'PUT'),
   unfollow: (externalUserId: string) => request<void>(`/follows/${id(externalUserId)}`, 'DELETE'),
 
