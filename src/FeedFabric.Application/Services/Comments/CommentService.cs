@@ -9,27 +9,34 @@ namespace FeedFabric.Application.Services.Comments;
 
 public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator moderator, TimeProvider timeProvider) : ICommentService
 {
-    public async Task<CommentResult> ListAsync(Guid postId, CommentQuery query, CancellationToken cancellationToken)
+    public async Task<CommentResult> ListAsync(string externalUserId, Guid postId, CommentQuery query, CancellationToken cancellationToken)
     {
-        if (!await db.Posts.AnyAsync(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null, cancellationToken))
+        var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        if (!await VisiblePosts(viewerId).AnyAsync(p => p.Id == postId, cancellationToken))
         {
             return new CommentResult(CommentResultStatus.PostNotFound);
         }
 
-        var page = await PageAsync(db.Comments.Where(c => c.PostId == postId && c.ParentCommentId == null), query, cancellationToken);
+        var page = await PageAsync(viewerId, db.Comments.Where(c => c.PostId == postId && c.ParentCommentId == null), query, cancellationToken);
         return new CommentResult(CommentResultStatus.Ok, Page: page);
     }
 
-    public async Task<CommentResult> ListRepliesAsync(Guid commentId, CommentQuery query, CancellationToken cancellationToken)
+    public async Task<CommentResult> ListRepliesAsync(string externalUserId, Guid commentId, CommentQuery query, CancellationToken cancellationToken)
     {
-        if (!await db.Comments.AnyAsync(c => c.Id == commentId, cancellationToken))
+        var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        if (!await db.Comments.AnyAsync(c => c.Id == commentId && (c.Status != ContentStatus.Held || c.AuthorId == viewerId), cancellationToken))
         {
             return new CommentResult(CommentResultStatus.CommentNotFound);
         }
 
-        var page = await PageAsync(db.Comments.Where(c => c.ParentCommentId == commentId), query, cancellationToken);
+        var page = await PageAsync(viewerId, db.Comments.Where(c => c.ParentCommentId == commentId), query, cancellationToken);
         return new CommentResult(CommentResultStatus.Ok, Page: page);
     }
+
+    // Posts the viewer can comment on and read comments of: visible ones, and their own held ones
+    private IQueryable<PostEntity> VisiblePosts(Guid? viewerId) =>
+        db.Posts.Where(p => p.DeletedAt == null && p.RepostOfId == null
+            && (p.Status == ContentStatus.Visible || (p.Status == ContentStatus.Held && p.AuthorId == viewerId)));
 
     public async Task<CommentResult> CreateAsync(string externalUserId, Guid postId, CommentRequest request, CancellationToken cancellationToken)
     {
@@ -39,8 +46,8 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
             return new CommentResult(CommentResultStatus.UserNotFound);
         }
 
-        var postAuthorId = await db.Posts
-            .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null)
+        var postAuthorId = await VisiblePosts(authorId)
+            .Where(p => p.Id == postId)
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         if (postAuthorId is null)
@@ -50,24 +57,18 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
 
         // A reply must be to a live comment on the same post
         if (request.ParentCommentId is { } parentId
-            && !await db.Comments.AnyAsync(c => c.Id == parentId && c.PostId == postId && c.DeletedAt == null, cancellationToken))
+            && !await db.Comments.AnyAsync(c => c.Id == parentId && c.PostId == postId && c.DeletedAt == null
+                && (c.Status == ContentStatus.Visible || (c.Status == ContentStatus.Held && c.AuthorId == authorId)), cancellationToken))
         {
             return new CommentResult(CommentResultStatus.CommentNotFound);
         }
 
-        if (await moderator.CheckAsync(request.Content, cancellationToken) is { } violation)
+        var verdict = await moderator.CheckAsync(request.Content, cancellationToken);
+        if (verdict is { Action: ModerationAction.Block })
         {
-            db.ModerationEvents.Add(new ModerationEventEntity
-            {
-                UserId = authorId.Value,
-                Kind = "comment",
-                Category = violation.Category,
-                Score = violation.Score,
-                Excerpt = request.Content.Length > 120 ? request.Content[..117] + "…" : request.Content,
-                CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            });
+            db.ModerationEvents.Add(Event(authorId.Value, verdict, request.Content, postId, null, timeProvider.GetUtcNow().UtcDateTime));
             await db.SaveChangesAsync(cancellationToken);
-            return new CommentResult(CommentResultStatus.ContentViolation, Violation: violation.Category);
+            return new CommentResult(CommentResultStatus.ContentViolation, Violation: verdict.Category);
         }
 
         var comment = new CommentEntity
@@ -77,8 +78,14 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
             ParentCommentId = request.ParentCommentId,
             Content = request.Content,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            Status = verdict is null ? ContentStatus.Visible : ContentStatus.Held,
         };
         db.Comments.Add(comment);
+        if (verdict is not null)
+        {
+            // Saved with the comment, so a held comment is always in the review queue
+            db.ModerationEvents.Add(Event(comment.AuthorId, verdict, comment.Content, postId, comment.Id, comment.CreatedAt));
+        }
         // Same SaveChanges as the comment, so the event exists exactly when the comment does
         db.AddEvent(EventTypes.CommentCreated, postId.ToString(), comment.AuthorId, ToEvent(comment, postAuthorId.Value), comment.CreatedAt);
         await db.AddMentionsAsync(comment.AuthorId, postId, comment.Id, comment.Content, comment.CreatedAt, cancellationToken);
@@ -114,10 +121,13 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
         return CommentResultStatus.Ok;
     }
 
-    // Deleted comments only show while they still have replies to hold together
-    private async Task<CommentPageResponse> PageAsync(IQueryable<CommentEntity> comments, CommentQuery query, CancellationToken cancellationToken)
+    // Deleted and removed comments only show while they still have replies to hold together. Held ones only show to
+    // their author. Suspended accounts' comments don't show.
+    private async Task<CommentPageResponse> PageAsync(Guid? viewerId, IQueryable<CommentEntity> comments, CommentQuery query, CancellationToken cancellationToken)
     {
-        comments = comments.Where(c => c.DeletedAt == null || db.Comments.Any(r => r.ParentCommentId == c.Id));
+        comments = comments.Where(c => (c.Status != ContentStatus.Held || c.AuthorId == viewerId)
+            && db.Users.Any(u => u.Id == c.AuthorId && u.Status == UserStatus.Active)
+            && ((c.DeletedAt == null && c.Status != ContentStatus.Removed) || db.Comments.Any(r => r.ParentCommentId == c.Id)));
         if (query.Cursor is { } cursor)
         {
             comments = comments.Where(c => c.Id.CompareTo(cursor) > 0);
@@ -142,11 +152,26 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
             AuthorId = c.AuthorId,
             AuthorExternalUserId = u.ExternalUserId,
             AuthorUsername = u.Username,
-            Content = c.DeletedAt == null ? c.Content : null,
-            IsDeleted = c.DeletedAt != null,
+            Content = c.DeletedAt == null && c.Status != ContentStatus.Removed ? c.Content : null,
+            IsDeleted = c.DeletedAt != null || c.Status == ContentStatus.Removed,
+            IsHeld = c.Status == ContentStatus.Held,
             CreatedAt = c.CreatedAt,
-            ReplyCount = db.Comments.Count(r => r.ParentCommentId == c.Id && r.DeletedAt == null),
+            // Visible replies: a held one is only counted once it's approved
+            ReplyCount = db.Comments.Count(r => r.ParentCommentId == c.Id && r.DeletedAt == null && r.Status == ContentStatus.Visible),
         });
+
+    private static ModerationEventEntity Event(Guid userId, ModerationVerdict verdict, string text, Guid postId, Guid? commentId, DateTime at) => new()
+    {
+        UserId = userId,
+        Kind = "comment",
+        Action = verdict.Action == ModerationAction.Block ? ModerationActions.Blocked : ModerationActions.Held,
+        Category = verdict.Category,
+        Score = verdict.Score,
+        Excerpt = ModerationEventEntity.ExcerptOf(text),
+        PostId = verdict.Action == ModerationAction.Hold ? postId : null,
+        CommentId = commentId,
+        CreatedAt = at,
+    };
 
     private static CommentCreatedEvent ToEvent(CommentEntity comment, Guid postAuthorId) => new()
     {

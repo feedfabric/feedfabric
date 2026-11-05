@@ -17,15 +17,25 @@ public class ModerationOptions
     // The same character repeated this many times or more is treated as flooding ("!!!!!!!!!!!!")
     public int MaxRepeatedCharacters { get; set; } = 12;
 
-    // The offensive-language classifier's labels and the score (0 to 1) at which each stops a post or comment.
-    // Aimed at extremely offensive language: hate, threats and severe abuse are stopped early; insults only when the
-    // model is sure; ordinary swearing ("bloody knackered after that run") isn't stopped. Labels not listed never stop.
+    // The offensive-language classifier's labels and the score (0 to 1) at which each acts on a post or comment.
+    // Threats are refused outright, since publishing one is the harm. Severe abuse and hate are held early, insults
+    // and sexually explicit messages only when the model is sure: held means saved but seen only by the author until
+    // a reviewer decides. Ordinary swearing ("bloody knackered after that run") isn't stopped, so obscene isn't
+    // listed; labels in neither list never act. ml/tune_toxicity.py tests the model against both, so keep its
+    // LIMITS in step.
     public Dictionary<string, double> ToxicityRejectAt { get; set; } = new()
     {
-        ["severe_toxic"] = 0.5,
         ["threat"] = 0.6,
-        ["identity_hate"] = 0.6,
-        ["insult"] = 0.9,
-        ["obscene"] = 0.97,
     };
+
+    public Dictionary<string, double> ToxicityHoldAt { get; set; } = new()
+    {
+        ["severe_toxicity"] = 0.5,
+        ["identity_attack"] = 0.6,
+        ["insult"] = 0.9,
+        ["sexual_explicit"] = 0.9,
+    };
+
+    // A post or comment this many different people have reported is held for review
+    public int ReportsToHold { get; set; } = 3;
 }

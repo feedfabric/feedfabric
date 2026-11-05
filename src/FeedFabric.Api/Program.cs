@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
+using FeedFabric.Api.Admin;
 using FeedFabric.Api.Dev;
 using FeedFabric.Api.Storage;
 using FeedFabric.Api.Errors;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Impressions;
@@ -70,18 +72,18 @@ builder.Services.AddSingleton<RankerModel>();
 builder.Services.Configure<ModerationOptions>(builder.Configuration.GetSection(ModerationOptions.Section));
 builder.Services.AddSingleton<ToxicityClassifier>();
 builder.Services.AddSingleton<TextModerator>();
+builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<ReviewService>();
+builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<AdminPostService>();
 builder.Services.AddScoped<EmbeddingStore>();
 // The last day's post embeddings in memory, for meaning-based candidates
 builder.Services.AddSingleton<EmbeddingIndex>();
 
-// Local dev: every request is user 1, or the user named in an X-Dev-User header or Bearer token.
-// Swap for AddJwtBearer with the real issuer before running outside Development.
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddAuthentication(DevAuthenticationHandler.SchemeName)
-        .AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(DevAuthenticationHandler.SchemeName, null);
-}
-builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment);
+// Who's calling: FeedFabric trusts the host's identity provider rather than having accounts (AuthOptions)
+builder.Services.AddFeedFabricAuth(builder.Configuration, builder.Environment);
+builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment).AddModerationPolicies(builder.Environment)
+    .AddAdminPolicies(builder.Environment);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 // Every error, including auth, routing and unhandled exceptions, is Problem Details with a "code"
@@ -120,21 +122,18 @@ app.UseStatusCodePages();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapDevEndpoints();
-    app.MapDashboardEndpoints();
-    // The simulator app, built from web/simulator into wwwroot. Its client-side routes all load index.html.
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
-    foreach (var route in new[] { "live", "home", "mentions", "dashboard", "studio/{**path}", "studio", "u/{**path}", "post/{**path}", "tags/{**path}", "by/{**path}" })
-    {
-        app.MapFallbackToFile(route, "index.html");
-    }
 }
+
+// The admin panel's overview; the panel itself (web/admin) is a separate static site
+app.MapDashboardEndpoints();
 
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+// A signed-in user's first request creates their FeedFabric user from the token
+app.UseMiddleware<UserProvisioning>();
+app.UseMiddleware<SuspendedUsers>();
 
 app.MapControllers();
 

@@ -37,6 +37,9 @@ public class HomeFeedPostResponse
 
     public HomeFeedPostResponse? RepostOf {get;set;}
 
+    // Held for review: only its author is ever shown it, so they know why nobody else can see it yet
+    public bool IsHeld {get;set;}
+
     // Hashtags first, then inferred topics
     public IReadOnlyList<TagResponse> Tags {get;set;} = [];
 

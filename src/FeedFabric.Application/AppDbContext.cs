@@ -40,6 +40,8 @@ public class AppDbContext : DbContext
 
     public DbSet<ModerationEventEntity> ModerationEvents => Set<ModerationEventEntity>();
 
+    public DbSet<ReportEntity> Reports => Set<ReportEntity>();
+
     public DbSet<RankingProfileEntity> RankingProfiles => Set<RankingProfileEntity>();
 
     public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
@@ -254,11 +256,44 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.Settings).HasColumnType("jsonb");
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.SavedBy).HasMaxLength(64);
 
+        modelBuilder.Entity<PostEntity>().Property(p => p.Status).HasConversion<string>().HasMaxLength(16);
+        modelBuilder.Entity<CommentEntity>().Property(c => c.Status).HasConversion<string>().HasMaxLength(16);
+
         modelBuilder.Entity<ModerationEventEntity>().HasIndex(m => m.CreatedAt);
         modelBuilder.Entity<ModerationEventEntity>().HasIndex(m => new { m.UserId, m.CreatedAt });
         modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Kind).HasMaxLength(16);
         modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Category).HasMaxLength(32);
         modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Excerpt).HasMaxLength(120);
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Action).HasMaxLength(16);
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Decision).HasMaxLength(16);
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.ReviewedBy).HasMaxLength(64);
+        // Serves the review queue: what's waiting, oldest first
+        modelBuilder.Entity<ModerationEventEntity>()
+            .HasIndex(m => m.CreatedAt, "IX_ModerationEvents_Open")
+            .HasFilter("\"ReviewedAt\" IS NULL AND \"Action\" <> 'blocked'");
+        modelBuilder.Entity<ModerationEventEntity>().HasIndex(m => new { m.PostId, m.CommentId });
+
+        // One report per person per post or comment; a post's own reports have CommentId null
+        modelBuilder.Entity<ReportEntity>()
+            .HasIndex(r => new { r.PostId, r.CommentId, r.ReporterId })
+            .IsUnique()
+            .AreNullsDistinct(false);
+        modelBuilder.Entity<ReportEntity>().Property(r => r.Reason).HasMaxLength(16);
+        modelBuilder.Entity<ReportEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(r => r.ReporterId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ReportEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(r => r.PostId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ReportEntity>()
+            .HasOne<CommentEntity>()
+            .WithMany()
+            .HasForeignKey(r => r.CommentId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Only unpublished rows are indexed, so the publisher's poll stays fast as the table grows
         modelBuilder.Entity<OutboxMessageEntity>()

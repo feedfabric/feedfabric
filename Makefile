@@ -4,7 +4,7 @@ export ConnectionStrings__Default = Host=localhost;Port=$(POSTGRES_PORT);Databas
 
 EF = dotnet ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Api
 
-.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop migrate migration web web-build train models
+.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop migrate migration admin admin-build train tune-toxicity models
 
 up:
 	docker compose up -d --build
@@ -47,18 +47,25 @@ simulate:
 simulate-stop:
 	docker compose --profile sim rm -sf simulator
 
-# Simulator app with hot reload on http://localhost:5173; API calls go to the API on :5161 (override with API_URL)
-web:
-	cd web/simulator && npm install --no-audit --no-fund && npm run dev
+# Admin panel with hot reload on http://localhost:5180; API calls go to the API on :5161 (override with API_URL)
+admin:
+	cd web/admin && npm install --no-audit --no-fund && npm run dev
 
-# Builds the simulator app into the API's wwwroot, served at http://localhost:5161/ in Development
-web-build:
-	cd web/simulator && npm install --no-audit --no-fund && npm run build
+# Builds the admin panel as a static site into web/admin/dist, to serve from anywhere that forwards /admin, /ranking
+# and /blobs to the API
+admin-build:
+	cd web/admin && npm install --no-audit --no-fund && npm run build
 
 # Downloads the pretrained models (nudity, offensive language, text embeddings) into .blobs. Photos and text aren't
 # published without the safety models, so run this once before posting.
 models:
 	cd ml && uv run fetch_models.py
+
+# Fine-tunes the offensive-language model on this app's wording ("kill it at the race" isn't a threat) and publishes
+# it to .blobs over the one make models fetched; restart the API to load it. Downloads about 1 GB the first time and
+# takes about 45 minutes on an Apple-silicon Mac. It won't publish a model that fails its tests (ml/tune_toxicity.py).
+tune-toxicity:
+	cd ml && uv run --group tune tune_toxicity.py
 
 # Trains the For You ranker from the feed log and publishes it to .blobs; the API loads it within a minute.
 # Needs uv (brew install uv), on a Mac LightGBM's OpenMP runtime (brew install libomp), and some feed history:

@@ -1,4 +1,5 @@
 using FeedFabric.Application.Services;
+using FeedFabric.Application.Services.Safety;
 
 public class PostEntity : EntityBase
 {
@@ -19,4 +20,7 @@ public class PostEntity : EntityBase
 
     // Soft delete: set instead of removing the row
     public DateTime? DeletedAt {get;set;}
+
+    // Held for review, or removed by a reviewer: see ContentStatus
+    public ContentStatus Status {get;set;}
 }

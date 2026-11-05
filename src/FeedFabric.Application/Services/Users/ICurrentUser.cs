@@ -2,6 +2,6 @@ namespace FeedFabric.Application.Services.Users;
 
 public interface ICurrentUser
 {
-    // The JWT "sub" claim: the user's ID in the external system (UserEntity.ExternalUserId)
+    // The user's ID in the host system, from its token (UserEntity.ExternalUserId)
     string ExternalUserId { get; }
 }

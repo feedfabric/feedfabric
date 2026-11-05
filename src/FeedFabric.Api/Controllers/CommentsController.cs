@@ -16,7 +16,7 @@ public class CommentsController(ICommentService commentService, ICurrentUser cur
     [HttpGet("posts/{postId:guid}/comments")]
     public async Task<ActionResult<CommentPageResponse>> List(Guid postId, [FromQuery] CommentQuery query, CancellationToken cancellationToken)
     {
-        var result = await commentService.ListAsync(postId, query, cancellationToken);
+        var result = await commentService.ListAsync(currentUser.ExternalUserId, postId, query, cancellationToken);
         return result.Status == CommentResultStatus.Ok ? Ok(result.Page) : ToProblem(result.Status);
     }
 
@@ -24,7 +24,7 @@ public class CommentsController(ICommentService commentService, ICurrentUser cur
     [HttpGet("comments/{commentId:guid}/replies")]
     public async Task<ActionResult<CommentPageResponse>> ListReplies(Guid commentId, [FromQuery] CommentQuery query, CancellationToken cancellationToken)
     {
-        var result = await commentService.ListRepliesAsync(commentId, query, cancellationToken);
+        var result = await commentService.ListRepliesAsync(currentUser.ExternalUserId, commentId, query, cancellationToken);
         return result.Status == CommentResultStatus.Ok ? Ok(result.Page) : ToProblem(result.Status);
     }
 

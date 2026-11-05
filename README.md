@@ -32,18 +32,20 @@
 - **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested*.
 - **Ranking profiles.** Every part of For You is a setting: sources, goals, your own scoring formula, freshness, variety, exploration, boosts and filters. Six presets come built in, and the **Feed studio** previews changes live before you save a new version.
 - **Content safety, all on your own servers:**
-  - **Text:** rules (blocked terms, link spam, flooding) plus a toxicity classifier.
+  - **Text:** rules (blocked terms, link spam, flooding) plus a toxicity classifier. Rule breaks and threats are blocked; insults, hate and sexually explicit text are held, visible only to their author until a moderator approves or removes them in the admin app. Members can report posts and comments, and three reports hold one for review.
   - **Photos:** ClamAV scan, file-type sniffing, a rebuild that strips EXIF, and a nudity classifier.
   - **Failure handling:** if a check can't run, the post is blocked.
 - **Events through an outbox to Kafka**, with idempotent consumers and separate consumer groups for fan-out, engagement, media and embeddings.
 - **Pluggable blob storage:** local disk in development, or any S3-compatible service (S3, R2, MinIO, LocalStack).
-- **A simulator** that populates the system with 1,000 users, British English conversations and realistic reading behaviour, plus a Vue 3 app and a live dashboard to watch it.
+- **A simulator** that populates the system with 1,000 users, British English conversations and realistic reading behaviour.
+- **An admin panel** for running it: a live dashboard, a review queue, reports, the moderation log, users and posts (suspend, verify, approve, remove), the Feed studio, and the server's settings and models.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    App[Vue simulator app] -->|REST| API[FeedFabric.Api]
+    Admin[Admin panel] -->|REST| API[FeedFabric.Api]
+    Apps[Your apps] -->|REST| API
     Sim[FeedFabric.Simulator] -->|services| DB
     API --> DB[(PostgreSQL)]
     API --> Redis[(Redis<br/>timelines, affinity,<br/>embeddings)]
@@ -65,7 +67,7 @@ flowchart LR
 | `src/FeedFabric.Application` | Domain, EF Core, services, ranking and safety |
 | `src/FeedFabric.Worker.Events` | Outbox publisher and Kafka consumers: fan-out, engagement, media scanning, embeddings |
 | `src/FeedFabric.Simulator` | Seeds users, backfills conversations, and posts, reads and engages in real time |
-| `web/simulator` | Vue 3 app: feeds, profiles, threads, impersonation and the dashboard |
+| `web/admin` | Vue 3 admin panel: dashboard, moderation, users, posts, Feed studio and system settings |
 | `ml/` | Ranker training, synthetic conversation generator and model downloads (Python, `uv`) |
 | `tests/` | xUnit tests |
 
@@ -78,10 +80,10 @@ cp .env.example .env
 make models      # download the safety and embedding models (once)
 make up          # Postgres, Kafka, Redis, API and worker
 make simulate    # seed users, backfill 14 days of conversations, then run live
-make web         # the app at http://localhost:5173
+make admin       # the admin panel at http://localhost:5180
 ```
 
-Open **http://localhost:5173/live** to follow the most active user, or **/dashboard** for platform engagement, ranking experiments and safety.
+Open **http://localhost:5180** for the dashboard: platform engagement, ranking experiments and safety. In Development any user can sign in to the panel; elsewhere it needs a staff role from your identity provider ([docs/auth.md](docs/auth.md)).
 
 After the simulator has run for a while, run `make train` to train the For You ranker. The API picks up the new model within a minute. On a Mac, LightGBM first needs `brew install libomp`.
 
@@ -94,15 +96,16 @@ After the simulator has run for a while, run `make train` to train the For You r
 | `make up` / `make down` / `make down-all` | Start everything; stop the app containers; stop everything (data is kept) |
 | `make run` / `make run-worker` | Run the API or worker on your machine against Compose |
 | `make simulate` / `make simulate-stop` | Start or stop the simulator |
-| `make web` / `make web-build` | Run the app with hot reload; build it into the API's `wwwroot` |
+| `make admin` / `make admin-build` | Run the admin panel with hot reload at http://localhost:5180; build it as a static site into `web/admin/dist` |
 | `make models` | Download the pretrained models into `.blobs/models` |
+| `make tune-toxicity` | Fine-tune the offensive-language model on this app's wording and publish it to `.blobs` (about 45 minutes) |
 | `make train` | Train the ranker on the feed log and publish it as ONNX |
 | `make migration name=AddX` / `make migrate` | Create or apply an EF Core migration (the API also migrates on startup in development) |
 | `make logs` / `make logs-worker` / `make psql` / `make redis` | Logs and shells |
 
 ## API
 
-All routes need a bearer token. In development, send `X-Dev-User: <externalUserId>` instead.
+All routes need a bearer token from your identity provider: Auth0, Entra ID, Cognito, Keycloak, or your own OpenID Connect server. FeedFabric has no accounts of its own; it checks the token and creates the user on their first request. See [docs/auth.md](docs/auth.md) to plug in yours. In development, send `X-Dev-User: <externalUserId>` instead.
 
 | Area | Routes |
 |---|---|
@@ -111,6 +114,10 @@ All routes need a bearer token. In development, send `X-Dev-User: <externalUserI
 | Comments | `GET`/`POST /userfeed/posts/{id}/comments`, `GET /userfeed/comments/{id}/replies`, `DELETE /userfeed/comments/{id}` |
 | Likes | `PUT`/`DELETE /userfeed/posts/{id}/like` |
 | Reposts | `PUT`/`DELETE /userfeed/posts/{id}/repost` |
+| Reports | `POST /userfeed/posts/{id}/report`, `POST /userfeed/comments/{id}/report` |
+| Moderation (`moderator` role) | `GET /admin/moderation/overview`, `/queue`, `/reports`, `/log`; `POST /admin/moderation/posts/{id}/decision`, `/comments/{id}/decision` |
+| Users and posts (`moderator` role) | `GET /admin/users`, `GET /admin/users/{externalUserId}`, `PUT /admin/users/{externalUserId}/status`, `PUT /admin/users/{externalUserId}/verified`, `GET /admin/posts`, `GET /admin/posts/{id}` |
+| Staff (`moderator` or `ranking-admin`) | `GET /admin/me`, `GET /admin/dashboard`, `GET /admin/system` |
 | Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested` |
 | Tags and mentions | `GET /userfeed/tags/trending`, `GET /userfeed/tags/{tag}/posts`, `GET /userfeed/mentions` |
 | Follows | `PUT`/`DELETE /follows/{externalUserId}` |
@@ -162,7 +169,7 @@ if(topic_match > 0.2, formula, formula * 0.2)              mostly your topics
 
 **Saving adds a version.** Every feed served is logged with the profile that built it (`running-club@3`), so the dashboard compares profiles and versions on real engagement. Set `Ranking:DefaultProfile` to change the default. Pick one per request with `?profile=`, or split the simulator's readers between several with `Simulator:ForYouProfiles`.
 
-**Feed studio** (`/studio` in the app):
+**Feed studio** (in the admin panel):
 - choose a profile, change any setting, and watch the preview update for any user
 - each post shows how far it moved against the saved version
 - a summary compares the mix: share from people you follow, author variety, age and photos
@@ -174,11 +181,11 @@ Outside Development, the profile endpoints need the `ranking-admin` role.
 | Job | Model | Runs in |
 |---|---|---|
 | For You ranking | LightGBM, trained in `ml/` | API |
-| Offensive language | [`unitary/toxic-bert`](https://huggingface.co/unitary/toxic-bert) (ONNX by Xenova) | API |
+| Offensive language | [`unitary/unbiased-toxic-roberta`](https://huggingface.co/unitary/unbiased-toxic-roberta), Detoxify's `unbiased` model (ONNX by onnx-community), fine-tuned on this app's wording by `make tune-toxicity` | API |
 | Nudity | [`Falconsai/nsfw_image_detection`](https://huggingface.co/Falconsai/nsfw_image_detection) (8-bit ONNX by onnx-community) | Media worker |
 | Meaning similarity | [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | Embeddings worker |
 
-All of them run with ONNX Runtime on CPU. Versions are pinned in `ml/fetch_models.py`.
+All of them run with ONNX Runtime on CPU. Versions are pinned in `ml/fetch_models.py`. As published, the offensive-language model reads sport talk as violence ("kill it at the race" scores as a threat), so `make tune-toxicity` fine-tunes it on this app's wording and only publishes it if it passes its tests (`ml/tune_toxicity.py`).
 
 ## Simulated data
 

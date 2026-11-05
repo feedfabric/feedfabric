@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Safety;
+using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Tags;
 
@@ -9,7 +11,8 @@ public class TagService(AppDbContext db, IMediaService media, TimeProvider timeP
     public async Task<HomeFeedResponse> PostsAsync(string tag, HomeFeedQuery query, CancellationToken cancellationToken)
     {
         var normalized = tag.TrimStart('#').ToLowerInvariant();
-        var posts = db.Posts.Where(p => p.DeletedAt == null && db.PostTags.Any(t => t.PostId == p.Id && t.Tag == normalized));
+        var posts = db.Posts.Where(p => p.DeletedAt == null && p.Status == ContentStatus.Visible && db.Users.Any(u => u.Id == p.AuthorId && u.Status == UserStatus.Active)
+            && db.PostTags.Any(t => t.PostId == p.Id && t.Tag == normalized));
         if (query.Cursor is { } cursor)
         {
             posts = posts.Where(p => p.Id.CompareTo(cursor) < 0);
@@ -31,7 +34,7 @@ public class TagService(AppDbContext db, IMediaService media, TimeProvider timeP
     {
         var since = timeProvider.GetUtcNow().UtcDateTime.AddHours(-hours);
         return await db.PostTags.AsNoTracking()
-            .Where(t => t.CreatedAt >= since)
+            .Where(t => t.CreatedAt >= since && db.Posts.Any(p => p.Id == t.PostId && p.DeletedAt == null && p.Status == ContentStatus.Visible))
             .GroupBy(t => t.Tag)
             .Select(g => new TrendingTagResponse { Tag = g.Key, Posts = g.Count() })
             .OrderByDescending(t => t.Posts)

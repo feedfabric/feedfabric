@@ -5,7 +5,7 @@ namespace FeedFabric.Api.Auth;
 public static class RankingPolicies
 {
     // Changing ranking profiles changes everyone's feed. Development lets any signed-in user in, for the simulator
-    // app; everywhere else needs the "ranking-admin" role claim from the identity provider.
+    // app; everywhere else needs a role the host's identity provider grants that AuthOptions.Roles.RankingAdmin lists.
     public const string Admin = "RankingAdmin";
     public const string AdminRole = "ranking-admin";
 
@@ -15,7 +15,8 @@ public static class RankingPolicies
             policy.RequireAuthenticatedUser();
             if (!environment.IsDevelopment())
             {
-                policy.RequireRole(AdminRole);
+                // Mapped from the host's own role names by IdentityClaims (AuthOptions.Roles)
+                policy.RequireClaim(IdentityClaims.Role, AdminRole);
             }
         });
 }

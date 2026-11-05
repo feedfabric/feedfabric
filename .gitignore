@@ -5,7 +5,6 @@
 bin/
 obj/
 dist/
-src/FeedFabric.Api/wwwroot/
 node_modules/
 __pycache__/
 .venv/
@@ -17,6 +16,3 @@ __pycache__/
 # LocalBlobStorage files and downloaded or trained models in dev
 src/*/blobs/
 .blobs/
-
-# Private front ends kept outside the public repo
-web/.gro_simulator/
