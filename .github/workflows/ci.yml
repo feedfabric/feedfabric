@@ -1,0 +1,127 @@
+# Builds and tests everything on each pull request. On main and version tags it also publishes the API and worker
+# images to GitHub Container Registry: ghcr.io/<owner>/<repo>/api and .../worker-events.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request makes the older run pointless
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build and test
+    runs-on: ubuntu-latest
+    services:
+      # For S3BlobStorageTests; ClamAvScannerTests stay skipped, since clamd takes minutes to load its database
+      localstack:
+        image: localstack/localstack:4.7
+        env:
+          SERVICES: s3
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health | grep -Eq '\"s3\": \"(available|running)\"'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # The pretrained models (about 300 MB), pinned by revision in fetch_models.py, so they only change with it.
+      # The fine-tuned toxicity model isn't here: tests that need it are skipped (Models.SkipUnlessTuned).
+      - name: Cache models
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: .blobs/models
+          key: models-${{ hashFiles('ml/fetch_models.py') }}
+
+      - name: Download models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: python3 -I ml/fetch_models.py
+
+      - run: dotnet build --configuration Release
+
+      - run: dotnet test --configuration Release --no-build
+
+  admin:
+    name: Admin panel build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/admin/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      # Type-checks, then builds
+      - run: npm run build
+
+  images:
+    name: Image (${{ matrix.image }})
+    needs: dotnet
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: api
+            dockerfile: src/FeedFabric.Api/Dockerfile
+          - image: worker-events
+            dockerfile: src/FeedFabric.Worker.Events/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # main: latest and sha-<short>; a tag v1.2.3: 1.2.3 and 1.2
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # Pull requests build the image to prove it builds, without pushing it
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
