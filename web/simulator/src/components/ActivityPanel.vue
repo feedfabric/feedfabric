@@ -14,7 +14,7 @@ const fresh = ref(new Set<string>())
 let first = true
 
 const key = (a: Activity) => `${a.kind}:${a.actorExternalUserId}:${a.postId}:${a.createdAt}`
-const verbs = { like: 'liked', comment: 'commented on', reply: 'replied on' } as const
+const verbs = { like: 'liked', comment: 'commented on', reply: 'replied on', repost: 'reposted' } as const
 
 const { error } = usePolling(async () => {
   const next = await api.engagement()

@@ -26,7 +26,7 @@
 
 ## Features
 
-- **Posts, comments, likes and follows**, with nested replies, `#hashtags`, inferred topics and `@mentions`.
+- **Posts, comments, likes, reposts and follows**, with nested replies, `#hashtags`, inferred topics and `@mentions`.
 - **Following and For You feeds.** Following is a Redis timeline per user, filled by fan-out on write. For You draws candidates from four sources (network, popular in your topics, similar readers, similar meaning) and ranks them.
 - **A learned ranker.** LightGBM predicts five outcomes per post (open, like, comment, long read, skip), runs in C# through ONNX Runtime on CPU, and falls back to a scoring formula when no model is loaded.
 - **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested*.
@@ -110,6 +110,7 @@ All routes need a bearer token. In development, send `X-Dev-User: <externalUserI
 | Posts | `POST /userfeed/posts`, `PUT`/`DELETE /userfeed/posts/{id}` |
 | Comments | `GET`/`POST /userfeed/posts/{id}/comments`, `GET /userfeed/comments/{id}/replies`, `DELETE /userfeed/comments/{id}` |
 | Likes | `PUT`/`DELETE /userfeed/posts/{id}/like` |
+| Reposts | `PUT`/`DELETE /userfeed/posts/{id}/repost` |
 | Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested` |
 | Tags and mentions | `GET /userfeed/tags/trending`, `GET /userfeed/tags/{tag}/posts`, `GET /userfeed/mentions` |
 | Follows | `PUT`/`DELETE /follows/{externalUserId}` |

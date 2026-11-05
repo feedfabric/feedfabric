@@ -6,11 +6,32 @@ namespace FeedFabric.Application.Services.Feed;
 
 public static class FeedPostQueries
 {
-    // Signs fresh URLs for each post's images; done after the query since signing can't happen in SQL
+    // Not deleted, and for a repost, its original isn't deleted either
+    public static IQueryable<PostEntity> Live(this IQueryable<PostEntity> posts, AppDbContext db) =>
+        posts.Where(p => p.DeletedAt == null && (p.RepostOfId == null || db.Posts.Any(o => o.Id == p.RepostOfId && o.DeletedAt == null)));
+
+    // Fills in RepostOf on each repost with the post it shares
+    public static async Task AttachRepostsAsync(this IReadOnlyList<HomeFeedPostResponse> posts, AppDbContext db, CancellationToken cancellationToken)
+    {
+        var ids = posts.Where(p => p.RepostOfId is not null).Select(p => p.RepostOfId!.Value).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var originals = await db.Posts.Where(p => ids.Contains(p.Id)).ToFeedPosts(db).ToDictionaryAsync(p => p.Id, cancellationToken);
+        foreach (var post in posts.Where(p => p.RepostOfId is not null))
+        {
+            post.RepostOf = originals.GetValueOrDefault(post.RepostOfId!.Value);
+        }
+    }
+
+    // Signs fresh URLs for each post's images, reposted ones included; done after the query since signing can't happen in SQL
     public static async Task AttachMediaAsync(this IReadOnlyList<HomeFeedPostResponse> posts, IMediaService media, CancellationToken cancellationToken)
     {
-        var byPost = await media.ForPostsAsync(posts.Select(p => p.Id).ToList(), cancellationToken);
-        foreach (var post in posts)
+        var all = posts.Concat(posts.Select(p => p.RepostOf).OfType<HomeFeedPostResponse>()).ToList();
+        var byPost = await media.ForPostsAsync(all.Select(p => p.Id).Distinct().ToList(), cancellationToken);
+        foreach (var post in all)
         {
             post.Media = byPost.GetValueOrDefault(post.Id) ?? [];
         }
@@ -27,6 +48,7 @@ public static class FeedPostQueries
             Content = p.Content,
             CreatedAt = p.CreatedAt,
             EditedAt = p.EditedAt,
+            RepostOfId = p.RepostOfId,
             Tags = db.PostTags.Where(t => t.PostId == p.Id)
                 .OrderBy(t => t.Source).ThenBy(t => t.Tag)
                 .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })

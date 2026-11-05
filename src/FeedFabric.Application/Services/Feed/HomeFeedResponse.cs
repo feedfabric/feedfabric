@@ -31,6 +31,12 @@ public class HomeFeedPostResponse
 
     public DateTime? EditedAt {get;set;}
 
+    // On a repost: the post it shares, in RepostOf. The repost itself has no content, tags or media; its author
+    // is who reposted it and CreatedAt is when.
+    public Guid? RepostOfId {get;set;}
+
+    public HomeFeedPostResponse? RepostOf {get;set;}
+
     // Hashtags first, then inferred topics
     public IReadOnlyList<TagResponse> Tags {get;set;} = [];
 

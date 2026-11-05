@@ -24,7 +24,7 @@ public class PostEmbeddingHandler(AppDbContext db, TextEmbedder embedder, Embedd
         }
 
         var post = await db.Posts.AsNoTracking()
-            .Where(p => p.Id == envelope.Data.PostId && p.DeletedAt == null)
+            .Where(p => p.Id == envelope.Data.PostId && p.DeletedAt == null && p.RepostOfId == null)
             .Select(p => new { p.Id, p.Content, p.CreatedAt })
             .SingleOrDefaultAsync(cancellationToken);
         if (post is null)
@@ -46,7 +46,7 @@ public class PostEmbeddingHandler(AppDbContext db, TextEmbedder embedder, Embedd
 
         var since = DateTime.UtcNow.AddHours(-24);
         var posts = await db.Posts.AsNoTracking()
-            .Where(p => p.CreatedAt >= since && p.DeletedAt == null)
+            .Where(p => p.CreatedAt >= since && p.DeletedAt == null && p.RepostOfId == null)
             .OrderBy(p => p.Id)
             .Select(p => new { p.Id, p.Content, p.CreatedAt })
             .ToListAsync(cancellationToken);

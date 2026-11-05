@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Tags;
@@ -28,7 +29,7 @@ public static class DevEndpoints
             return externalUserId is null ? Results.NotFound() : Results.Ok(new { externalUserId });
         });
 
-        // Like and comment counts for a page of posts, and whether the viewer likes each one
+        // Like, comment and repost counts for a page of posts, and whether the viewer likes and has reposted each one
         dev.MapGet("/likes", async (string ids, string? viewer, AppDbContext db, CancellationToken cancellationToken) =>
         {
             var postIds = ids.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse).Take(100).ToList();
@@ -41,11 +42,13 @@ public static class DevEndpoints
                     Likes = db.Likes.Count(l => l.PostId == p.Id),
                     LikedByViewer = db.Likes.Any(l => l.PostId == p.Id && l.UserId == viewerId),
                     Comments = db.Comments.Count(c => c.PostId == p.Id && c.DeletedAt == null),
+                    Reposts = db.Posts.Count(r => r.RepostOfId == p.Id && r.DeletedAt == null),
+                    RepostedByViewer = db.Posts.Any(r => r.RepostOfId == p.Id && r.DeletedAt == null && r.AuthorId == viewerId),
                 })
                 .ToListAsync(cancellationToken);
         });
 
-        // The latest likes and comments from anyone, and the viewer's top authors and topics as the worker has scored them
+        // The latest likes, comments and reposts from anyone, and the viewer's top authors and topics as the worker has scored them
         // in Redis (a like counts 1, a comment 2; topics are weighted by how sure each tag is)
         dev.MapGet("/engagement", async (string? viewer, AppDbContext db, IConnectionMultiplexer redis, CancellationToken cancellationToken) =>
         {
@@ -65,7 +68,15 @@ public static class DevEndpoints
                     x.c.ParentCommentId == null ? "comment" : "reply", x.c.CreatedAt, x.actor.ExternalUserId, x.actor.Username,
                     author.ExternalUserId, author.Username, x.p.Id, x.p.Content, x.c.Content))
                 .ToListAsync(cancellationToken);
-            var recent = likes.Concat(comments).OrderByDescending(a => a.CreatedAt).Take(ActivitySize).ToList();
+            var reposts = await db.Posts.AsNoTracking()
+                .Where(r => r.RepostOfId != null && r.DeletedAt == null)
+                .OrderByDescending(r => r.Id).Take(ActivitySize)
+                .Join(db.Users, r => r.AuthorId, u => u.Id, (r, actor) => new { r, actor })
+                .Join(db.Posts, x => x.r.RepostOfId, p => p.Id, (x, p) => new { x.r, x.actor, p })
+                .Join(db.Users, x => x.p.AuthorId, u => u.Id, (x, author) => new Activity(
+                    "repost", x.r.CreatedAt, x.actor.ExternalUserId, x.actor.Username, author.ExternalUserId, author.Username, x.p.Id, x.p.Content, null))
+                .ToListAsync(cancellationToken);
+            var recent = likes.Concat(comments).Concat(reposts).OrderByDescending(a => a.CreatedAt).Take(ActivitySize).ToList();
 
             var viewerId = await FindIdAsync(db, viewer, cancellationToken);
             var affinity = new List<object>();
@@ -100,7 +111,7 @@ public static class DevEndpoints
         {
             var viewerId = await FindIdAsync(db, viewer, cancellationToken);
             var post = await db.Posts.AsNoTracking()
-                .Where(p => p.Id == postId && p.DeletedAt == null)
+                .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null)
                 .Join(db.Users, p => p.AuthorId, u => u.Id, (p, u) => new
                 {
                     p.Id,
@@ -110,6 +121,8 @@ public static class DevEndpoints
                     Likes = db.Likes.Count(l => l.PostId == p.Id),
                     LikedByViewer = db.Likes.Any(l => l.PostId == p.Id && l.UserId == viewerId),
                     Comments = db.Comments.Count(c => c.PostId == p.Id && c.DeletedAt == null),
+                    Reposts = db.Posts.Count(r => r.RepostOfId == p.Id && r.DeletedAt == null),
+                    RepostedByViewer = db.Posts.Any(r => r.RepostOfId == p.Id && r.DeletedAt == null && r.AuthorId == viewerId),
                     Tags = db.PostTags.Where(t => t.PostId == p.Id)
                         .OrderBy(t => t.Source).ThenBy(t => t.Tag)
                         .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })
@@ -123,7 +136,8 @@ public static class DevEndpoints
             var media = await mediaService.ForPostsAsync([post.Id], cancellationToken);
             return Results.Ok(new
             {
-                post.Id, post.Content, post.CreatedAt, post.Author, post.Likes, post.LikedByViewer, post.Comments, post.Tags,
+                post.Id, post.Content, post.CreatedAt, post.Author, post.Likes, post.LikedByViewer, post.Comments, post.Reposts,
+                post.RepostedByViewer, post.Tags,
                 Media = media.GetValueOrDefault(post.Id) ?? [],
             });
         });
@@ -182,25 +196,35 @@ public static class DevEndpoints
                 .OrderBy(u => u.Username).Take(ListSize)
                 .ToListAsync(cancellationToken);
 
-            var posts = await db.Posts.AsNoTracking()
-                .Where(p => p.AuthorId == user.Id && p.DeletedAt == null)
+            // Their posts and reposts, newest first; a repost shows the post it shares
+            var entries = await db.Posts.AsNoTracking()
+                .Where(p => p.AuthorId == user.Id)
+                .Live(db)
                 .OrderByDescending(p => p.Id).Take(PostCount)
-                .Select(p => new
+                .Select(p => new { p.Id, PostId = p.RepostOfId ?? p.Id, IsRepost = p.RepostOfId != null, p.CreatedAt })
+                .ToListAsync(cancellationToken);
+            var shownIds = entries.Select(e => e.PostId).Distinct().ToList();
+            var shown = await db.Posts.AsNoTracking()
+                .Where(p => shownIds.Contains(p.Id))
+                .Join(db.Users, p => p.AuthorId, u => u.Id, (p, u) => new
                 {
                     p.Id,
                     p.Content,
                     p.CreatedAt,
+                    Author = new { u.ExternalUserId, u.Username },
                     Likes = db.Likes.Count(l => l.PostId == p.Id),
                     LikedByViewer = db.Likes.Any(l => l.PostId == p.Id && l.UserId == viewerId),
                     Comments = db.Comments.Count(c => c.PostId == p.Id && c.DeletedAt == null),
+                    Reposts = db.Posts.Count(r => r.RepostOfId == p.Id && r.DeletedAt == null),
+                    RepostedByViewer = db.Posts.Any(r => r.RepostOfId == p.Id && r.DeletedAt == null && r.AuthorId == viewerId),
                     Tags = db.PostTags.Where(t => t.PostId == p.Id)
                         .OrderBy(t => t.Source).ThenBy(t => t.Tag)
                         .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })
                         .ToList(),
                 })
-                .ToListAsync(cancellationToken);
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
 
-            var media = await mediaService.ForPostsAsync(posts.Select(p => p.Id).ToList(), cancellationToken);
+            var media = await mediaService.ForPostsAsync(shownIds, cancellationToken);
             return Results.Ok(new
             {
                 user.ExternalUserId,
@@ -211,10 +235,17 @@ public static class DevEndpoints
                 viewerFollows,
                 followers,
                 following,
-                Posts = posts.Select(p => new
+                Posts = entries.Where(e => shown.ContainsKey(e.PostId)).Select(e =>
                 {
-                    p.Id, p.Content, p.CreatedAt, p.Likes, p.LikedByViewer, p.Comments, p.Tags,
-                    Media = media.GetValueOrDefault(p.Id) ?? [],
+                    var p = shown[e.PostId];
+                    return new
+                    {
+                        e.Id, PostId = p.Id, p.Content, p.CreatedAt, p.Author, p.Likes, p.LikedByViewer, p.Comments, p.Reposts,
+                        p.RepostedByViewer, p.Tags,
+                        Media = media.GetValueOrDefault(p.Id) ?? [],
+                        RepostedBy = e.IsRepost ? new { user.ExternalUserId, user.Username } : null,
+                        RepostedAt = e.IsRepost ? e.CreatedAt : (DateTime?)null,
+                    };
                 }),
             });
         });
@@ -225,7 +256,7 @@ public static class DevEndpoints
             ? null
             : await db.Users.Where(u => u.ExternalUserId == externalUserId).Select(u => (Guid?)u.Id).SingleOrDefaultAsync(cancellationToken);
 
-    // One line in the page's live activity panel: who liked or commented on whose post
+    // One line in the page's live activity panel: who liked, commented on or reposted whose post
     private record Activity(string Kind, DateTime CreatedAt, string ActorExternalUserId, string ActorUsername,
         string AuthorExternalUserId, string AuthorUsername, Guid PostId, string PostContent, string? CommentContent);
 }

@@ -21,7 +21,7 @@ public static class DashboardEndpoints
             var since = now.AddMinutes(-window);
 
             // Activity in the window
-            var posts = await db.Posts.CountAsync(p => p.CreatedAt >= since && p.DeletedAt == null, cancellationToken);
+            var posts = await db.Posts.CountAsync(p => p.CreatedAt >= since && p.DeletedAt == null && p.RepostOfId == null, cancellationToken);
             var likes = await db.Likes.CountAsync(l => l.CreatedAt >= since, cancellationToken);
             var comments = await db.Comments.CountAsync(c => c.CreatedAt >= since && c.DeletedAt == null, cancellationToken);
             var actors = (await db.Posts.Where(p => p.CreatedAt >= since).Select(p => p.AuthorId).Distinct().ToListAsync(cancellationToken))
@@ -268,7 +268,7 @@ public static class DashboardEndpoints
                 Totals = new
                 {
                     Users = await db.Users.CountAsync(cancellationToken),
-                    Posts = await db.Posts.CountAsync(p => p.DeletedAt == null, cancellationToken),
+                    Posts = await db.Posts.CountAsync(p => p.DeletedAt == null && p.RepostOfId == null, cancellationToken),
                     Likes = await db.Likes.CountAsync(cancellationToken),
                     Comments = await db.Comments.CountAsync(c => c.DeletedAt == null, cancellationToken),
                     Follows = await db.Follows.CountAsync(cancellationToken),

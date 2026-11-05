@@ -36,15 +36,22 @@ export interface Upload {
   expiresAt: string
 }
 
+// One entry on a profile: a post of theirs, or a post they reposted (repostedBy set; id is the repost's, postId the post's)
 export interface ProfilePost {
   id: string
+  postId: string
   content: string
   createdAt: string
   tags: Tag[]
   media?: PostMedia[]
+  author: UserRef
   likes: number
   likedByViewer: boolean
   comments: number
+  reposts: number
+  repostedByViewer: boolean
+  repostedBy: UserRef | null
+  repostedAt: string | null
 }
 
 export interface Profile extends UserRef {
@@ -62,6 +69,8 @@ export interface PostStats {
   likes: number
   likedByViewer: boolean
   comments: number
+  reposts: number
+  repostedByViewer: boolean
 }
 
 // Why a For You post is where it is
@@ -93,6 +102,8 @@ export interface HomeFeedPost {
   tags: Tag[]
   media?: PostMedia[]
   ranking?: PostRanking | null
+  // On a repost: the post it shares. The repost's author is who reposted it, and createdAt when.
+  repostOf?: HomeFeedPost | null
 }
 
 export interface HomeFeed {
@@ -111,6 +122,8 @@ export interface PostDetail {
   likes: number
   likedByViewer: boolean
   comments: number
+  reposts: number
+  repostedByViewer: boolean
 }
 
 export interface Comment {
@@ -131,7 +144,7 @@ export interface CommentPage {
 }
 
 export interface Activity {
-  kind: 'like' | 'comment' | 'reply'
+  kind: 'like' | 'comment' | 'reply' | 'repost'
   createdAt: string
   actorExternalUserId: string
   actorUsername: string
@@ -168,9 +181,11 @@ export interface MentionPage {
   nextCursor: string | null
 }
 
-// What a post card shows, whichever endpoint it came from
+// What a post card shows, whichever endpoint it came from. id is the feed entry (a repost's own ID for a repost),
+// postId the post shown, liked and commented on.
 export interface CardPost {
   id: string
+  postId: string
   content: string
   createdAt: string
   tags: Tag[]
@@ -180,6 +195,9 @@ export interface CardPost {
   likes: number
   likedByViewer: boolean
   comments: number
+  reposts: number
+  repostedByViewer: boolean
+  repostedBy?: UserRef | null
 }
 
 export interface DashboardPost {

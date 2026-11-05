@@ -275,11 +275,16 @@ public class ForYouService(
             }
         }
 
+        // Reposts in the timeline stand for the posts they share
+        var reposted = await db.Posts.Where(p => ids.Contains(p.Id) && p.RepostOfId != null)
+            .Select(p => p.RepostOfId!.Value).ToListAsync(cancellationToken);
+        ids.UnionWith(reposted);
+
         var hidden = (await database.SetMembersAsync(HiddenKey(viewerId))).Select(v => Guid.Parse(v.ToString())).ToHashSet();
         ids.ExceptWith(hidden);
 
         var oldest = profile.Freshness.MaxAgeHours is { } maxAge ? now - TimeSpan.FromHours(maxAge) : DateTime.MinValue;
-        return await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null && p.AuthorId != viewerId && p.CreatedAt >= oldest)
+        return await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null && p.RepostOfId == null && p.AuthorId != viewerId && p.CreatedAt >= oldest)
             .ToFeedPosts(db).ToListAsync(cancellationToken);
     }
 

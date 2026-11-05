@@ -7,6 +7,8 @@ public enum PostResultStatus
     NotFound,
     Forbidden,
     EditWindowClosed,
+    // Reposts have no text of their own to edit
+    IsRepost,
     TooManyMedia,
     // An image is missing, someone else's, or already on another post
     MediaNotFound,

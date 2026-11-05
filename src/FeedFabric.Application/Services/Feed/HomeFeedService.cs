@@ -58,12 +58,15 @@ public class HomeFeedService(
         }
 
         var page = posts.Take(query.Limit).ToList();
+        await page.AttachRepostsAsync(db, cancellationToken);
         await page.AttachMediaAsync(media, cancellationToken);
 
-        // Logged with the same signals as For You, so both feeds are training data and can be compared
-        var signals = await features.BuildAsync(userId.Value, page, cancellationToken);
+        // Logged with the same signals as For You, so both feeds are training data and can be compared. A repost is
+        // logged as the post it shares, since that's what the viewer sees, likes and opens.
+        var shown = page.Select(p => p.RepostOf ?? p).ToList();
+        var signals = await features.BuildAsync(userId.Value, shown, cancellationToken);
         await feedLog.LogServedAsync(userId.Value, FeedNames.Following, "chronological",
-            page.Select((p, i) => new ServedPost(p.Id, i, 0, signals[p.Id])).ToList(), cancellationToken);
+            shown.Select((p, i) => new ServedPost(p.Id, i, 0, signals[p.Id])).ToList(), cancellationToken);
         return new HomeFeedResponse
         {
             Posts = page,
@@ -118,7 +121,7 @@ public class HomeFeedService(
     private async Task<bool> IsTimelineFullAsync(Guid userId) =>
         await redis.GetDatabase().SortedSetLengthAsync(FeedKeys.ForUser(userId)) >= options.Value.MaxLength;
 
-    // Posts in the given order, skipping any that are deleted or missing
+    // Posts in the given order, skipping any that are deleted or missing, and reposts of deleted posts
     private async Task<List<HomeFeedPostResponse>> LoadAsync(List<Guid> ids, CancellationToken cancellationToken)
     {
         if (ids.Count == 0)
@@ -126,7 +129,7 @@ public class HomeFeedService(
             return [];
         }
 
-        var found = await db.Posts.Where(p => ids.Contains(p.Id) && p.DeletedAt == null).ToFeedPosts(db)
+        var found = await db.Posts.Where(p => ids.Contains(p.Id)).Live(db).ToFeedPosts(db)
             .ToDictionaryAsync(p => p.Id, cancellationToken);
         return ids.Where(found.ContainsKey).Select(id => found[id]).ToList();
     }
@@ -134,8 +137,8 @@ public class HomeFeedService(
     // Fan-out on read: the same feed straight from the follow graph
     private Task<List<HomeFeedPostResponse>> FromPostgresAsync(Guid userId, Guid? before, int take, CancellationToken cancellationToken)
     {
-        var posts = db.Posts.Where(p => p.DeletedAt == null
-            && (p.AuthorId == userId || db.Follows.Any(f => f.FollowerId == userId && f.FolloweeId == p.AuthorId)));
+        var posts = db.Posts.Live(db)
+            .Where(p => p.AuthorId == userId || db.Follows.Any(f => f.FollowerId == userId && f.FolloweeId == p.AuthorId));
         if (before is { } cursor)
         {
             posts = posts.Where(p => p.Id.CompareTo(cursor) < 0);

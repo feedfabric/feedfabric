@@ -22,9 +22,10 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 |---|---|---|---|
 | `validation_failed` | 400 | | See `errors` below |
 | `user.not_synced` | 404 | `externalUserId` | The signed-in user has no local user record yet |
-| `post.not_found` | 404 | | No such post, or it was deleted |
+| `post.not_found` | 404 | | No such post, or it was deleted. Liking or commenting on a repost's own ID also gives this; use the original's |
 | `post.not_author` | 403 | | Only the author can edit or delete a post |
 | `post.edit_window_closed` | 409 | `editWindowMinutes` | The edit window has passed |
+| `post.is_repost` | 409 | | Reposts can't be edited |
 | `post.too_many_media` | 400 | | Too many images on one post |
 | `comment.not_found` | 404 | | No such comment, or it was deleted |
 | `comment.not_author` | 403 | | Only the author can edit or delete a comment |

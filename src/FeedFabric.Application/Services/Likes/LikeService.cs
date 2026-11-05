@@ -67,7 +67,7 @@ public class LikeService(AppDbContext db, FeedLog feedLog, TimeProvider timeProv
         }
 
         var authorId = await db.Posts
-            .Where(p => p.Id == postId && p.DeletedAt == null)
+            .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null)
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         return authorId is null

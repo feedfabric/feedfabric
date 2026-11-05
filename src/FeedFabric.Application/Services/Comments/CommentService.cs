@@ -11,7 +11,7 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
 {
     public async Task<CommentResult> ListAsync(Guid postId, CommentQuery query, CancellationToken cancellationToken)
     {
-        if (!await db.Posts.AnyAsync(p => p.Id == postId && p.DeletedAt == null, cancellationToken))
+        if (!await db.Posts.AnyAsync(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null, cancellationToken))
         {
             return new CommentResult(CommentResultStatus.PostNotFound);
         }
@@ -40,7 +40,7 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
         }
 
         var postAuthorId = await db.Posts
-            .Where(p => p.Id == postId && p.DeletedAt == null)
+            .Where(p => p.Id == postId && p.DeletedAt == null && p.RepostOfId == null)
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         if (postAuthorId is null)

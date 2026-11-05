@@ -15,7 +15,8 @@ public class FeedService(AppDbContext db) : IFeedService
         }
 
         var posts = db.Posts.AsNoTracking()
-            .Where(p => p.AuthorId == userId.Value && p.DeletedAt == null);
+            .Where(p => p.AuthorId == userId.Value)
+            .Live(db);
 
         if (query.Gt is { } gt)
         {

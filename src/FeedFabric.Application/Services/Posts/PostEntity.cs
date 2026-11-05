@@ -11,6 +11,9 @@ public class PostEntity : EntityBase
 
     public DateTime CreatedAt {get;set;}
 
+    // Set on a repost: the original post it shares. Reposts have no content of their own.
+    public Guid? RepostOfId {get;set;}
+
     // You have one hour to edit a post, until it can become uneditable
     public DateTime? EditedAt {get;set;}
 
