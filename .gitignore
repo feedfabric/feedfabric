@@ -1,0 +1,22 @@
+.env
+.DS_Store
+
+# Build output
+bin/
+obj/
+dist/
+src/FeedFabric.Api/wwwroot/
+node_modules/
+__pycache__/
+.venv/
+
+# Personal IDE state; shared Rider settings and the run configs in .run/ are kept (.idea has its own .gitignore)
+.vs/
+*.user
+
+# LocalBlobStorage files and downloaded or trained models in dev
+src/*/blobs/
+.blobs/
+
+# Private front ends kept outside the public repo
+web/.gro_simulator/

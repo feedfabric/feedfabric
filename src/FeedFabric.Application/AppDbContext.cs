@@ -1,0 +1,259 @@
+using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.Follows;
+using FeedFabric.Application.Services.Likes;
+using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Mentions;
+using FeedFabric.Application.Services.Messaging;
+using FeedFabric.Application.Services.Ranking;
+using FeedFabric.Application.Services.Ranking.Profiles;
+using FeedFabric.Application.Services.Safety;
+using FeedFabric.Application.Services.Tags;
+using FeedFabric.Application.Services.Users;
+
+public class AppDbContext : DbContext
+{
+     public AppDbContext(DbContextOptions<AppDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<UserEntity> Users => Set<UserEntity>();
+
+    public DbSet<PostEntity> Posts => Set<PostEntity>();
+
+    public DbSet<FollowEntity> Follows => Set<FollowEntity>();
+
+    public DbSet<LikeEntity> Likes => Set<LikeEntity>();
+
+    public DbSet<CommentEntity> Comments => Set<CommentEntity>();
+
+    public DbSet<PostTagEntity> PostTags => Set<PostTagEntity>();
+
+    public DbSet<MentionEntity> Mentions => Set<MentionEntity>();
+
+    public DbSet<MediaEntity> Media => Set<MediaEntity>();
+
+    public DbSet<PostMediaEntity> PostMedia => Set<PostMediaEntity>();
+
+    public DbSet<FeedLogEntity> FeedLog => Set<FeedLogEntity>();
+
+    public DbSet<ModerationEventEntity> ModerationEvents => Set<ModerationEventEntity>();
+
+    public DbSet<RankingProfileEntity> RankingProfiles => Set<RankingProfileEntity>();
+
+    public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
+
+    public DbSet<ProcessedEventEntity> ProcessedEvents => Set<ProcessedEventEntity>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserEntity>()
+            .HasIndex(u => u.ExternalUserId)
+            .IsUnique();
+
+        // Serves @mention lookups
+        modelBuilder.Entity<UserEntity>()
+            .HasIndex(u => u.Username);
+
+        // Author ID only, no navigation; the foreign key keeps AuthorId pointing at a real user
+        modelBuilder.Entity<PostEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(p => p.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Serves "posts by this user, newest first"; replaces the plain AuthorId index EF would add
+        modelBuilder.Entity<PostEntity>()
+            .HasIndex(p => new { p.AuthorId, p.Id });
+
+        modelBuilder.Entity<FollowEntity>()
+            .HasKey(f => new { f.FollowerId, f.FolloweeId });
+
+        // Serves fan-out: "followers of this author", paged by FollowerId
+        modelBuilder.Entity<FollowEntity>()
+            .HasIndex(f => new { f.FolloweeId, f.FollowerId });
+
+        modelBuilder.Entity<FollowEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(f => f.FollowerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FollowEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(f => f.FolloweeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<LikeEntity>()
+            .HasKey(l => new { l.UserId, l.PostId });
+
+        // Serves "who liked this post"
+        modelBuilder.Entity<LikeEntity>()
+            .HasIndex(l => new { l.PostId, l.UserId });
+
+        modelBuilder.Entity<LikeEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(l => l.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<LikeEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(l => l.PostId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Serves "comments on this post" (ParentCommentId null) in order
+        modelBuilder.Entity<CommentEntity>()
+            .HasIndex(c => new { c.PostId, c.ParentCommentId, c.Id });
+
+        // Serves "replies to this comment" in order, and reply counts
+        modelBuilder.Entity<CommentEntity>()
+            .HasIndex(c => new { c.ParentCommentId, c.Id });
+
+        modelBuilder.Entity<CommentEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(c => c.PostId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CommentEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(c => c.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CommentEntity>()
+            .HasOne<CommentEntity>()
+            .WithMany()
+            .HasForeignKey(c => c.ParentCommentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PostTagEntity>()
+            .HasKey(t => new { t.PostId, t.Tag });
+
+        // Serves tag pages, newest first
+        modelBuilder.Entity<PostTagEntity>()
+            .HasIndex(t => new { t.Tag, t.PostId });
+
+        // Serves trending: recent tags only
+        modelBuilder.Entity<PostTagEntity>()
+            .HasIndex(t => t.CreatedAt);
+
+        modelBuilder.Entity<PostTagEntity>()
+            .Property(t => t.Tag)
+            .HasMaxLength(50);
+
+        modelBuilder.Entity<PostTagEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(t => t.PostId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Serves "where was I mentioned", newest first
+        modelBuilder.Entity<MentionEntity>()
+            .HasIndex(m => new { m.MentionedUserId, m.Id });
+
+        modelBuilder.Entity<MentionEntity>()
+            .HasIndex(m => new { m.PostId, m.CommentId });
+
+        modelBuilder.Entity<MentionEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(m => m.MentionedUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MentionEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(m => m.AuthorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MentionEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(m => m.PostId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MentionEntity>()
+            .HasOne<CommentEntity>()
+            .WithMany()
+            .HasForeignKey(m => m.CommentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MediaEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(m => m.OwnerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MediaEntity>()
+            .Property(m => m.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        // Serves "this user's media" and stale-upload cleanup
+        modelBuilder.Entity<MediaEntity>()
+            .HasIndex(m => new { m.OwnerId, m.Status });
+
+        modelBuilder.Entity<PostMediaEntity>()
+            .HasKey(pm => new { pm.PostId, pm.MediaId });
+
+        // An image can only be on one post
+        modelBuilder.Entity<PostMediaEntity>()
+            .HasIndex(pm => pm.MediaId)
+            .IsUnique();
+
+        modelBuilder.Entity<PostMediaEntity>()
+            .HasOne<PostEntity>()
+            .WithMany()
+            .HasForeignKey(pm => pm.PostId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PostMediaEntity>()
+            .HasOne<MediaEntity>()
+            .WithMany()
+            .HasForeignKey(pm => pm.MediaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Serves label updates: "this viewer just liked this post, which they were served in the last hour"
+        modelBuilder.Entity<FeedLogEntity>()
+            .HasIndex(f => new { f.ViewerId, f.PostId, f.ServedAt });
+
+        // Serves the dashboard's windows and training exports
+        modelBuilder.Entity<FeedLogEntity>()
+            .HasIndex(f => f.ServedAt);
+
+        modelBuilder.Entity<FeedLogEntity>()
+            .Property(f => f.Features)
+            .HasColumnType("jsonb");
+
+        modelBuilder.Entity<FeedLogEntity>().Property(f => f.Feed).HasMaxLength(16);
+        modelBuilder.Entity<FeedLogEntity>().Property(f => f.Ranker).HasMaxLength(64);
+        modelBuilder.Entity<FeedLogEntity>().Property(f => f.Profile).HasMaxLength(64);
+
+        // One row per saved version; the latest is the live one
+        modelBuilder.Entity<RankingProfileEntity>()
+            .HasIndex(p => new { p.Key, p.Version })
+            .IsUnique();
+        modelBuilder.Entity<RankingProfileEntity>().Property(p => p.Key).HasMaxLength(RankingProfileStore.MaxKeyLength);
+        modelBuilder.Entity<RankingProfileEntity>().Property(p => p.Settings).HasColumnType("jsonb");
+        modelBuilder.Entity<RankingProfileEntity>().Property(p => p.SavedBy).HasMaxLength(64);
+
+        modelBuilder.Entity<ModerationEventEntity>().HasIndex(m => m.CreatedAt);
+        modelBuilder.Entity<ModerationEventEntity>().HasIndex(m => new { m.UserId, m.CreatedAt });
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Kind).HasMaxLength(16);
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Category).HasMaxLength(32);
+        modelBuilder.Entity<ModerationEventEntity>().Property(m => m.Excerpt).HasMaxLength(120);
+
+        // Only unpublished rows are indexed, so the publisher's poll stays fast as the table grows
+        modelBuilder.Entity<OutboxMessageEntity>()
+            .HasIndex(o => o.CreatedAt)
+            .HasFilter("\"ProcessedAt\" IS NULL");
+
+        modelBuilder.Entity<ProcessedEventEntity>()
+            .HasKey(e => new { e.EventId, e.Consumer });
+    }
+}

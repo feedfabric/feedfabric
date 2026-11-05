@@ -1,0 +1,16 @@
+[project]
+name = "feedfabric-ranker"
+version = "0.1.0"
+description = "Trains the For You ranker from the feed log and exports it to ONNX for the API"
+requires-python = ">=3.11"
+dependencies = [
+    "lightgbm>=4.7,<5",
+    "numpy>=2",
+    "onnx>=1.23",
+    "onnxmltools>=1.16",
+    "onnxruntime>=1.23",
+    "pandas>=2.2",
+    "psycopg[binary]>=3.2",
+    "scikit-learn>=1.6",
+    "boto3>=1.38",
+]

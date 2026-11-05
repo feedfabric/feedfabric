@@ -1,0 +1,17 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Repo-wide namespace prefix: every project defaults to FeedFabric.<Project>.
+       Projects already named FeedFabric.* keep their name; a project can still set its own RootNamespace. -->
+  <PropertyGroup>
+    <RepoRootNamespace>FeedFabric</RepoRootNamespace>
+    <RootNamespace Condition="'$(MSBuildProjectName)' == '$(RepoRootNamespace)' Or $(MSBuildProjectName.StartsWith('$(RepoRootNamespace).'))">$(MSBuildProjectName)</RootNamespace>
+    <RootNamespace Condition="'$(RootNamespace)' == ''">$(RepoRootNamespace).$(MSBuildProjectName)</RootNamespace>
+  </PropertyGroup>
+
+</Project>

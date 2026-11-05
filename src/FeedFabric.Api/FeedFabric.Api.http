@@ -1,0 +1,55 @@
+@FeedFabric_Api_HostAddress = http://localhost:5161
+
+GET {{FeedFabric_Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+# No header: signed in as user 1
+GET {{FeedFabric_Api_HostAddress}}/me
+
+###
+
+# Act as another user (local dev only)
+GET {{FeedFabric_Api_HostAddress}}/me
+X-Dev-User: 2
+
+###
+
+# Newest first; pass nextCursor back as &cursor= for the next page
+GET {{FeedFabric_Api_HostAddress}}/userfeed?limit=20
+
+###
+
+# Posts after an ID, oldest first (e.g. "what's new since I last looked")
+GET {{FeedFabric_Api_HostAddress}}/userfeed?gt=00000000-0000-0000-0000-000000000000&order=oldest
+
+###
+
+POST {{FeedFabric_Api_HostAddress}}/userfeed/posts
+Content-Type: application/json
+
+{ "content": "Hello FeedFabric" }
+
+###
+
+# Only within 1 hour of posting
+PUT {{FeedFabric_Api_HostAddress}}/userfeed/posts/<post-id>
+Content-Type: application/json
+
+{ "content": "Hello FeedFabric (edited)" }
+
+###
+
+DELETE {{FeedFabric_Api_HostAddress}}/userfeed/posts/<post-id>
+
+###
+
+# Follow a user by their external ID; repeating it is a no-op
+PUT {{FeedFabric_Api_HostAddress}}/follows/2
+
+###
+
+DELETE {{FeedFabric_Api_HostAddress}}/follows/2
+
+###

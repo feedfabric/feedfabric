@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FeedFabric.Api/FeedFabric.Api.csproj" />
+    <Project Path="src/FeedFabric.Application/FeedFabric.Application.csproj" />
+    <Project Path="src/FeedFabric.Simulator/FeedFabric.Simulator.csproj" />
+    <Project Path="src/FeedFabric.Worker.Events/FeedFabric.Worker.Events.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FeedFabric.Application.Tests/FeedFabric.Application.Tests.csproj" />
+  </Folder>
+</Solution>

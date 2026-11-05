@@ -1,0 +1,63 @@
+using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.Feed;
+using FeedFabric.Application.Services.Users;
+
+namespace FeedFabric.Application.Services.Mentions;
+
+public class MentionService(AppDbContext db) : IMentionService
+{
+    public async Task<MentionPageResponse?> ListAsync(string externalUserId, HomeFeedQuery query, CancellationToken cancellationToken)
+    {
+        var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        if (userId is null)
+        {
+            return null;
+        }
+
+        var mentions = db.Mentions.AsNoTracking().Where(m => m.MentionedUserId == userId);
+        if (query.Cursor is { } cursor)
+        {
+            mentions = mentions.Where(m => m.Id.CompareTo(cursor) < 0);
+        }
+
+        var page = await mentions
+            .OrderByDescending(m => m.Id)
+            .Join(db.Posts.Where(p => p.DeletedAt == null), m => m.PostId, p => p.Id, (m, p) => new { m, p })
+            .Join(db.Users, x => x.m.AuthorId, u => u.Id, (x, u) => new { x.m, x.p, u })
+            .Select(x => new
+            {
+                x.m.Id,
+                x.m.CreatedAt,
+                x.u.ExternalUserId,
+                x.u.Username,
+                x.m.PostId,
+                x.m.CommentId,
+                PostContent = x.p.Content,
+                Comment = db.Comments.Where(c => c.Id == x.m.CommentId).Select(c => new { c.Content, c.DeletedAt }).FirstOrDefault(),
+            })
+            .Take(query.Limit + 1)
+            .ToListAsync(cancellationToken);
+
+        // Read one extra row before filtering, so a deleted comment never hides that there's another page
+        var hasMore = page.Count > query.Limit;
+        var results = page.Take(query.Limit)
+            .Where(x => x.CommentId is null || x.Comment is { DeletedAt: null })
+            .Select(x => new MentionResponse
+            {
+                Id = x.Id,
+                CreatedAt = x.CreatedAt,
+                AuthorExternalUserId = x.ExternalUserId,
+                AuthorUsername = x.Username,
+                PostId = x.PostId,
+                CommentId = x.CommentId,
+                Content = x.Comment?.Content ?? x.PostContent,
+            })
+            .ToList();
+
+        return new MentionPageResponse
+        {
+            Mentions = results,
+            NextCursor = hasMore ? page[query.Limit - 1].Id : null,
+        };
+    }
+}

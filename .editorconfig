@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+# Generate `namespace X;` instead of a braced block
+csharp_style_namespace_declarations = file_scoped:warning
+# Flag namespaces that don't match the folder (IDE0130)
+dotnet_style_namespace_match_folder = true:suggestion
