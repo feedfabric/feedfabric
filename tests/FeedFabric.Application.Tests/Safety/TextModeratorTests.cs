@@ -74,15 +74,15 @@ public class TextModeratorTests
         Assert.Equal(text.Contains("your"), TextModerator.AddressesSomeone(text));
     }
 
-    // Insults only count when aimed at someone: laughing at yourself passes, the same word at someone is held
+    // Insults only count when aimed at someone: laughing at yourself passes, the same word at someone is flagged
     [Fact]
-    public async Task Insults_are_held_only_when_aimed_at_someone()
+    public async Task Insults_are_flagged_only_when_aimed_at_someone()
     {
         Models.SkipUnlessPresent("models/safety/toxicity");
 
         Assert.Null(await Create().CheckAsync("Physio signed me off today after 12 weeks! Grinning like an idiot.", TestContext.Current.CancellationToken));
         var aimed = await Create().CheckAsync("You're an idiot and nobody wants you here", TestContext.Current.CancellationToken);
-        Assert.Equal(ModerationAction.Hold, aimed?.Action);
+        Assert.Equal(ModerationAction.Flag, aimed?.Action);
     }
 
     [Theory]
@@ -100,7 +100,7 @@ public class TextModeratorTests
     }
 
     [Fact]
-    public async Task Threats_are_blocked_and_insults_held_for_review()
+    public async Task Threats_are_blocked_and_insults_flagged_for_review()
     {
         Models.SkipUnlessPresent("models/safety/toxicity");
 
@@ -108,7 +108,7 @@ public class TextModeratorTests
         var insult = await Create().CheckAsync("Shut up you stupid moron", TestContext.Current.CancellationToken);
 
         Assert.Equal(ModerationAction.Block, threat?.Action);
-        Assert.Equal(ModerationAction.Hold, insult?.Action);
+        Assert.Equal(ModerationAction.Flag, insult?.Action);
     }
 
     [Fact]

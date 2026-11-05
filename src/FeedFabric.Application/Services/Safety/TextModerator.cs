@@ -5,8 +5,8 @@ namespace FeedFabric.Application.Services.Safety;
 
 // What a post or comment must pass before it's saved: quick rules first (blocked terms, link spam, flooding), then
 // the offensive-language classifier for what rules can't see. Rule breaks and threats are blocked; what the
-// classifier is less sure is harm (insults aimed at someone, hate, sexually explicit) is held for a reviewer instead,
-// so a false positive costs a short wait rather than a post. Like photo checks it fails closed: if the classifier can't run,
+// classifier is less sure is harm (hate, sexually explicit) is held for a reviewer instead, so a false positive costs a
+// short wait rather than a post; and insults aimed at someone are flagged: published, but put in front of a reviewer. Like photo checks it fails closed: if the classifier can't run,
 // this throws and nothing is saved.
 public partial class TextModerator(IOptions<ModerationOptions> options, ToxicityClassifier toxicity)
 {
@@ -24,7 +24,7 @@ public partial class TextModerator(IOptions<ModerationOptions> options, Toxicity
     private int blockedFor;
 
     // Null when the text is fine; otherwise what to do and which rule it broke, with the classifier's score (1 for
-    // rules). Blocking wins over holding.
+    // rules). Blocking wins over holding, holding over flagging.
     public async Task<ModerationVerdict?> CheckAsync(string text, CancellationToken cancellationToken)
     {
         if (CheckRules(text) is { } rule)
@@ -40,7 +40,8 @@ public partial class TextModerator(IOptions<ModerationOptions> options, Toxicity
             scores = scores.Where(s => !settings.ToxicityOnlyWhenAddressed.Contains(s.Key)).ToDictionary();
         }
         return Worst(ModerationAction.Block, settings.ToxicityRejectAt, scores)
-            ?? Worst(ModerationAction.Hold, settings.ToxicityHoldAt, scores);
+            ?? Worst(ModerationAction.Hold, settings.ToxicityHoldAt, scores)
+            ?? Worst(ModerationAction.Flag, settings.ToxicityFlagAt, scores);
     }
 
     // Whether the text speaks to someone: "you're an idiot" does, "grinning like an idiot" doesn't
@@ -98,6 +99,9 @@ public enum ModerationAction
 
     // Save it, visible only to its author until a reviewer decides
     Hold,
+
+    // Publish it as normal, and put it in the review queue
+    Flag,
 }
 
 public record ModerationVerdict(ModerationAction Action, string Category, double Score);

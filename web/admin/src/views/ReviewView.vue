@@ -52,6 +52,7 @@ onUnmounted(() => window.clearInterval(timer))
 const stats = computed(() => overview.value && [
   { label: 'Waiting', value: overview.value.waiting, tone: overview.value.waiting ? 'warn' : 'good' },
   { label: 'Held today', value: overview.value.heldToday },
+  { label: 'Flagged today', value: overview.value.flaggedToday },
   { label: 'Blocked today', value: overview.value.blockedToday },
   { label: 'Reports today', value: overview.value.reportsToday },
   { label: 'Reviewed today', value: overview.value.reviewedToday },
@@ -64,8 +65,11 @@ function reasonText(r: ReviewReason) {
 }
 
 function reasonTone(action: string) {
-  return action === 'reported' ? 'warn' : 'bad'
+  return action === 'reported' || action === 'flagged' ? 'warn' : 'bad'
 }
+
+// Flagged and nothing else: still published, so approving keeps it up rather than showing it
+const live = (item: ReviewItem) => item.reasons.every(r => r.action === 'flagged')
 
 </script>
 
@@ -91,7 +95,8 @@ function reasonTone(action: string) {
     <div class="meta">
       <span class="chip">{{ item.kind }}</span>
       <RouterLink :to="{ name: 'user', params: { externalUserId: item.author.externalUserId } }" class="who">{{ item.author.username }}</RouterLink>
-      <span class="muted">{{ item.author.externalUserId }} · posted {{ ago(item.createdAt, now) }} · held {{ ago(item.heldAt, now) }}</span>
+      <span class="muted">{{ item.author.externalUserId }} · posted {{ ago(item.createdAt, now) }} · {{ live(item) ? 'flagged' : 'held' }} {{ ago(item.heldAt, now) }}</span>
+      <span v-if="live(item)" class="chip good">still published</span>
     </div>
     <p class="content">{{ item.content }}</p>
     <div class="why">
@@ -99,8 +104,8 @@ function reasonTone(action: string) {
       <span v-for="(count, reason) in item.reports" :key="reason" class="chip warn">{{ label(String(reason)) }} ×{{ count }}</span>
     </div>
     <div class="actions">
-      <button class="approve" :disabled="deciding.has(key(item))" @click="decide(item, 'approved')">Approve<span class="sr-only">, show it to everyone</span></button>
-      <button class="remove" :disabled="deciding.has(key(item))" @click="decide(item, 'removed')">Remove<span class="sr-only">, hide it from everyone</span></button>
+      <button class="approve" :disabled="deciding.has(key(item))" @click="decide(item, 'approved')">Approve<span class="sr-only">{{ live(item) ? ', keep it up' : ', show it to everyone' }}</span></button>
+      <button class="remove" :disabled="deciding.has(key(item))" @click="decide(item, 'removed')">Remove<span class="sr-only">{{ live(item) ? ', take it down for everyone' : ', hide it from everyone' }}</span></button>
       <RouterLink :to="{ name: 'post', params: { postId: item.postId } }" class="link">Open the {{ item.kind === 'post' ? 'post' : 'post it’s on' }}</RouterLink>
     </div>
   </article>

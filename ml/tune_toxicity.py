@@ -55,8 +55,8 @@ LABELS = [
 OFFENCES = LABELS[:7]
 COL = {label: i for i, label in enumerate(LABELS)}
 
-# Keep in step with ModerationOptions.ToxicityRejectAt and ToxicityHoldAt: the scores at which the API blocks a post
-# (threat) or holds it for review (the rest). Both keep it from other people, so the tests treat them the same.
+# Keep in step with ModerationOptions.ToxicityRejectAt, ToxicityHoldAt and ToxicityFlagAt: the scores at which the API
+# blocks a post (threat), holds it for review, or flags it (insult). The tests treat them all as acting on it.
 LIMITS = {"severe_toxicity": 0.5, "threat": 0.6, "identity_attack": 0.6, "insult": 0.9, "sexual_explicit": 0.9}
 
 MAX_TOKENS = 256

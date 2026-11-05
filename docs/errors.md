@@ -30,7 +30,7 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `post.too_many_media` | 400 | | Too many images on one post |
 | `comment.not_found` | 404 | | No such comment, or it was deleted |
 | `comment.not_author` | 403 | | Only the author can edit or delete a comment |
-| `content.violation` | 422 | `category` | The post or comment breaks the community rules, e.g. `threat`, `insult`, `link_spam` |
+| `content.violation` | 422 | `category` | The post or comment breaks the community rules, e.g. `threat`, `blocked_term`, `link_spam` |
 | `media.not_found` | 404 | | No such upload, it isn't yours, or it's already on another post |
 | `media.not_ready` | 409 | | An image hasn't finished scanning, or was rejected |
 | `media.type_not_allowed` | 415 | `allowed` | Only JPEG, PNG and WebP can be uploaded |

@@ -6,7 +6,7 @@ export interface UserRef {
   username: string
 }
 
-export type ModerationAction = 'blocked' | 'held' | 'reported' | 'reviewed'
+export type ModerationAction = 'blocked' | 'held' | 'flagged' | 'reported' | 'reviewed'
 export type Decision = 'approved' | 'removed'
 
 export interface ModerationOverview {
@@ -14,6 +14,7 @@ export interface ModerationOverview {
   oldestWaitingSince: string | null
   blockedToday: number
   heldToday: number
+  flaggedToday: number
   reportsToday: number
   reviewedToday: number
   removedToday: number

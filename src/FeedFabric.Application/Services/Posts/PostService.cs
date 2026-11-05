@@ -40,12 +40,12 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             AuthorId = authorId.Value,
             Content = request.Content,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            Status = verdict is null ? ContentStatus.Visible : ContentStatus.Held,
+            Status = verdict is { Action: ModerationAction.Hold } ? ContentStatus.Held : ContentStatus.Visible,
         };
         db.Posts.Add(post);
         if (verdict is not null)
         {
-            // Saved with the post, so a held post is always in the review queue
+            // Saved with the post, so a held or flagged post is always in the review queue
             db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, post.CreatedAt));
         }
         // Same SaveChanges as the post, so the event exists exactly when the post does
@@ -91,11 +91,14 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
 
         post.Content = request.Content;
         post.EditedAt = now;
-        // An edit that needs a look holds the post again, even if a reviewer approved the earlier text. A held post
-        // stays held until reviewed, however it's edited.
+        // An edit that needs a look holds or flags the post again, even if a reviewer approved the earlier text. A held
+        // post stays held until reviewed, however it's edited.
         if (verdict is not null && post.Status == ContentStatus.Visible)
         {
-            post.Status = ContentStatus.Held;
+            if (verdict.Action == ModerationAction.Hold)
+            {
+                post.Status = ContentStatus.Held;
+            }
             db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, now));
         }
 

@@ -51,8 +51,8 @@ public record ModerationLogEntry(
     Guid Id, string Kind, string Action, string Category, double Score, string? Excerpt, DateTime CreatedAt, UserRef Author,
     Guid? PostId, Guid? CommentId, string? Decision, string? ReviewedBy, DateTime? ReviewedAt, bool AuthorDeleted);
 
-public record ModerationOverview(int Waiting, DateTime? OldestWaitingSince, int BlockedToday, int HeldToday, int ReportsToday, int ReviewedToday,
-    int RemovedToday);
+public record ModerationOverview(int Waiting, DateTime? OldestWaitingSince, int BlockedToday, int HeldToday, int FlaggedToday, int ReportsToday,
+    int ReviewedToday, int RemovedToday);
 
 public enum ReviewResultStatus
 {
@@ -84,6 +84,7 @@ public class ReviewService(AppDbContext db, FeedLog feedLog, TimeProvider timePr
             await open.MinAsync(m => (DateTime?)m.CreatedAt, cancellationToken),
             today.GetValueOrDefault(ModerationActions.Blocked),
             today.GetValueOrDefault(ModerationActions.Held),
+            today.GetValueOrDefault(ModerationActions.Flagged),
             await db.Reports.CountAsync(r => r.CreatedAt >= since, cancellationToken),
             decided.Count,
             decided.Count(d => d == ReviewDecisions.Removed));
