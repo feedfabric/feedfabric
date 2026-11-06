@@ -12,6 +12,7 @@ const filters: { value: ModerationAction | null; label: string }[] = [
   { value: null, label: 'All' },
   { value: 'blocked', label: 'Blocked' },
   { value: 'held', label: 'Held' },
+  { value: 'flagged', label: 'Flagged' },
   { value: 'reported', label: 'Reported' },
   { value: 'reviewed', label: 'Staff actions' },
 ]

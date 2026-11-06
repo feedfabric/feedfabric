@@ -41,18 +41,24 @@ public class ModerationEventEntity : EntityBase
 
     public static string ExcerptOf(string text) => text.Length > 120 ? text[..117] + "…" : text;
 
-    // The classifier stopped a post or comment. Only held ones keep what they're about; blocked ones were never saved.
+    // The classifier stopped or flagged a post or comment. Held and flagged ones keep what they're about, which puts them
+    // in the review queue; blocked ones were never saved.
     public static ModerationEventEntity For(Guid userId, string kind, ModerationVerdict verdict, string text, Guid? postId, Guid? commentId,
         DateTime at) => new()
     {
         UserId = userId,
         Kind = kind,
-        Action = verdict.Action == ModerationAction.Block ? ModerationActions.Blocked : ModerationActions.Held,
+        Action = verdict.Action switch
+        {
+            ModerationAction.Block => ModerationActions.Blocked,
+            ModerationAction.Flag => ModerationActions.Flagged,
+            _ => ModerationActions.Held,
+        },
         Category = verdict.Category,
         Score = verdict.Score,
         Excerpt = ExcerptOf(text),
-        PostId = verdict.Action == ModerationAction.Hold ? postId : null,
-        CommentId = verdict.Action == ModerationAction.Hold ? commentId : null,
+        PostId = verdict.Action != ModerationAction.Block ? postId : null,
+        CommentId = verdict.Action != ModerationAction.Block ? commentId : null,
         CreatedAt = at,
     };
 }
@@ -67,6 +73,9 @@ public static class ModerationActions
 
     // Enough people reported it that it was held
     public const string Reported = "reported";
+
+    // Published as normal, and waiting for a reviewer to look at it
+    public const string Flagged = "flagged";
 
     // A reviewer removed it without it having been flagged
     public const string Reviewed = "reviewed";

@@ -81,15 +81,16 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
             ParentCommentId = request.ParentCommentId,
             Content = request.Content,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            Status = verdict is null ? ContentStatus.Visible : ContentStatus.Held,
+            Status = verdict is { Action: ModerationAction.Hold } ? ContentStatus.Held : ContentStatus.Visible,
         };
         db.Comments.Add(comment);
+        var held = comment.Status == ContentStatus.Held;
         if (verdict is not null)
         {
-            // Saved with the comment, so a held comment is always in the review queue
+            // Saved with the comment, so a held or flagged comment is always in the review queue
             db.ModerationEvents.Add(ModerationEventEntity.For(comment.AuthorId, "comment", verdict, comment.Content, postId, comment.Id, comment.CreatedAt));
         }
-        else
+        if (!held)
         {
             // Same SaveChanges as the comment, so the event exists exactly when the comment does. A held comment
             // counts as engagement only once a reviewer approves it (ReviewService.DecideAsync).
@@ -97,7 +98,7 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
         }
         await db.AddMentionsAsync(comment.AuthorId, postId, comment.Id, comment.Content, comment.CreatedAt, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        if (verdict is null)
+        if (!held)
         {
             await feedLog.MarkAsync(comment.AuthorId, postId, FeedSignal.Commented, cancellationToken);
         }
