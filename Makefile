@@ -4,7 +4,7 @@ export ConnectionStrings__Default = Host=localhost;Port=$(POSTGRES_PORT);Databas
 
 EF = dotnet ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Api
 
-.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop migrate migration admin admin-build train tune-toxicity models
+.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop migrate migration admin admin-build fabric train tune-toxicity models
 
 up:
 	docker compose up -d --build
@@ -55,6 +55,10 @@ admin:
 # and /blobs to the API
 admin-build:
 	cd web/admin && npm install --no-audit --no-fund && npm run build
+
+# FabricUI's gallery: every component in every state, on http://localhost:5190
+fabric:
+	cd web/fabric-ui && npm install --no-audit --no-fund && npm run dev
 
 # Downloads the pretrained models (nudity, offensive language, text embeddings) into .blobs. Photos and text aren't
 # published without the safety models, so run this once before posting.
