@@ -28,6 +28,10 @@ export default defineConfig({
       // Posting from the panel uses the member endpoints
       '/media': api,
       '/userfeed': api,
+      // Not called by the panel, but the API reference's "Try it" commands use this origin
+      '/follows': api,
+      '/favourites': api,
+      '^/me(\\?|$)': api,
       // The API's live OpenAPI document (Development only), for the API reference page; the saved copy is public/openapi.json
       '/openapi/': api,
     },

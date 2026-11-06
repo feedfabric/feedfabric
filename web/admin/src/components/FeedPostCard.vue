@@ -11,7 +11,8 @@ const props = defineProps<{ post: HomeFeedPost; now: number }>()
 const shown = computed(() => props.post.repostOf ?? props.post)
 const ranking = computed(() => props.post.ranking)
 // Text with its #hashtags and @mentions picked out, as members see them
-const parts = computed(() => shown.value.content.split(/([#@][\p{L}\p{N}_]+)/u).map(text => ({ text, tag: /^[#@]/.test(text) })))
+// split with one capture group alternates text and captures, so the odd parts are the tags
+const parts = computed(() => shown.value.content.split(/([#@][\p{L}\p{N}_]+)/u).map((text, i) => ({ text, tag: i % 2 === 1 })))
 const signed = (n: number) => `${n > 0 ? '+' : ''}${Number(n.toFixed(3))}`
 </script>
 

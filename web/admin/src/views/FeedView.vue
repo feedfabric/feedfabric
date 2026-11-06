@@ -89,7 +89,8 @@ function reset() {
   loadMore()
 }
 
-watch([viewer, () => tab.value, profile], reset)
+// The profile only matters to For You
+watch([viewer, () => tab.value, () => (tab.value === 'foryou' ? profile.value : '')], reset)
 
 // Loads the next page as the end of the list comes into view
 const sentinel = ref<HTMLElement | null>(null)
@@ -110,7 +111,9 @@ watch(viewer, async id => {
   if (!id) return
   if (id === me.value?.externalUserId && me.value.username) viewerName.value = me.value.username
   try {
-    viewerName.value = (await api.user(id)).user.username
+    const { username } = (await api.user(id)).user
+    // Another viewer may have been picked while this was loading
+    if (id === viewer.value) viewerName.value = username
   } catch {
     // Shown by ID
   }
@@ -133,7 +136,7 @@ const isMe = computed(() => viewer.value === me.value?.externalUserId)
     <FabricCard padding="sm">
       <FabricStack direction="row" align="center" justify="between" wrap :gap="3">
         <FabricStack direction="row" align="center" :gap="3">
-          <FabricAvatar :name="viewerName ?? viewer ?? '?'" :size="40" decorative />
+          <FabricAvatar :name="viewerName || viewer || '?'" :size="40" decorative />
           <div class="viewer">
             <strong>{{ viewerName ? `@${viewerName}` : viewer || '…' }}</strong>
             <span>

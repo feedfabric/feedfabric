@@ -59,7 +59,8 @@ admin-build:
 # Saves the API's OpenAPI document into the admin panel (web/admin/public/openapi.json), for its API reference page.
 # Needs the API running in Development (make run). Commit the result whenever the API changes.
 openapi:
-	curl -sf http://localhost:5161/openapi/v1.json | python3 -m json.tool --indent 2 > web/admin/public/openapi.json.tmp
+	curl -sf http://localhost:5161/openapi/v1.json | python3 -m json.tool --indent 2 > web/admin/public/openapi.json.tmp \
+		|| { rm -f web/admin/public/openapi.json.tmp; exit 1; }
 	mv web/admin/public/openapi.json.tmp web/admin/public/openapi.json
 
 # The docs site: how FeedFabric works and how to build a front end on it, on http://localhost:5186

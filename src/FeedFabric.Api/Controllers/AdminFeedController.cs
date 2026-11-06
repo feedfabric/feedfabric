@@ -6,6 +6,7 @@ using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Ranking.Profiles;
+using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Api.Controllers;
 
@@ -14,7 +15,8 @@ namespace FeedFabric.Api.Controllers;
 [ApiController]
 [Authorize(Policy = AdminPolicies.Staff)]
 [Route("admin/feed/{externalUserId}")]
-public class AdminFeedController(IHomeFeedService homeFeed, ForYouService forYou, RankingProfileStore profiles) : ControllerBase
+public class AdminFeedController(IHomeFeedService homeFeed, ForYouService forYou, RankingProfileStore profiles,
+    ICurrentUser currentUser) : ControllerBase
 {
     // GET /admin/feed/{externalUserId}/following?limit=20, then add &cursor=<nextCursor>: newest first, from the
     // accounts they follow
@@ -34,7 +36,7 @@ public class AdminFeedController(IHomeFeedService homeFeed, ForYouService forYou
             return this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.ProfileNotFound, $"There's no ranking profile called '{query.Profile}'.",
                 new { profile = query.Profile });
         }
-        return await forYou.PeekAsync(externalUserId, query, profile, cancellationToken) is { } feed ? feed : NotFoundUser(externalUserId);
+        return await forYou.PeekAsync(externalUserId, currentUser.ExternalUserId, query, profile, cancellationToken) is { } feed ? feed : NotFoundUser(externalUserId);
     }
 
     private ObjectResult NotFoundUser(string externalUserId) =>

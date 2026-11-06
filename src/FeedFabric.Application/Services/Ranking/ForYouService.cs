@@ -66,8 +66,10 @@ public class ForYouService(
     }
 
     // What this viewer's For You shows, paged like theirs but in a session of its own and without logging it, so
-    // looking neither becomes training data nor reshuffles the order they're paging through: for staff
-    public async Task<ForYouResponse?> PeekAsync(string externalUserId, ForYouQuery query, ResolvedProfile profile, CancellationToken cancellationToken)
+    // looking neither becomes training data nor reshuffles the order they're paging through: for staff. The session is
+    // per staff member too (staffExternalUserId), so two people looking at the same feed don't reshuffle each other's.
+    public async Task<ForYouResponse?> PeekAsync(string externalUserId, string staffExternalUserId, ForYouQuery query, ResolvedProfile profile,
+        CancellationToken cancellationToken)
     {
         var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
         if (viewerId is null)
@@ -75,7 +77,7 @@ public class ForYouService(
             return null;
         }
         var offset = Offset(query);
-        var session = await SessionAsync(viewerId.Value, offset, profile, PeekKey(viewerId.Value, profile), cancellationToken);
+        var session = await SessionAsync(viewerId.Value, offset, profile, PeekKey(viewerId.Value, staffExternalUserId, profile), cancellationToken);
         return await PageAsync(session, offset, query.Limit, profile, cancellationToken);
     }
 
@@ -385,7 +387,8 @@ public class ForYouService(
     // Per profile version, so switching profiles (or saving a new version) never pages through another one's order
     private static string SessionKey(Guid viewerId, ResolvedProfile profile) => $"foryou:{viewerId}:{profile.Label}";
 
-    private static string PeekKey(Guid viewerId, ResolvedProfile profile) => $"foryou-peek:{viewerId}:{profile.Label}";
+    private static string PeekKey(Guid viewerId, string staffExternalUserId, ResolvedProfile profile) =>
+        $"foryou-peek:{viewerId}:{staffExternalUserId}:{profile.Label}";
 
     private static string HiddenKey(Guid viewerId) => $"hidden:{viewerId}";
 

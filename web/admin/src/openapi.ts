@@ -106,9 +106,12 @@ export function constraints(schema: Schema | undefined): string[] {
   return notes
 }
 
-// The schema an object's fields come from, following a $ref or a single allOf
+// The schema an object's fields come from, following a $ref, a single allOf, or the one non-null variant of a nullable
+// reference (OpenAPI 3.1 writes those as oneOf [{ type: "null" }, { $ref }])
 export function objectSchema(doc: OpenApiDocument, schema: Schema | undefined): Schema | undefined {
   if (!schema) return undefined
+  const variants = (schema.oneOf ?? schema.anyOf)?.filter(v => v.type !== 'null')
+  if (variants?.length === 1) return objectSchema(doc, variants[0])
   const resolved = resolve(doc, schema.allOf?.length === 1 ? schema.allOf[0] : schema)
   if (resolved.properties) return resolved
   if (resolved.items) return objectSchema(doc, resolved.items)
