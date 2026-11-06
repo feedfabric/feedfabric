@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, resolveDynamicComponent } from 'vue'
 import FabricIcon, { type IconName } from './FabricIcon.vue'
 import FabricSpinner from './FabricSpinner.vue'
 
-// A button, or a link that looks like one when given href. While loading it keeps its width, shows a spinner and
+// A button, or a link that looks like one when given href, or to (an in-app route, through <RouterLink> when Vue
+// Router is installed). While loading it keeps its width, shows a spinner and
 // can't be pressed again. An icon-only button needs a label, which becomes its accessible name and tooltip.
 const props = withDefaults(defineProps<{
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'good'
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<{
   iconAfter?: IconName
   label?: string
   href?: string
+  to?: string | Record<string, unknown>
   target?: string
   loading?: boolean
   disabled?: boolean
@@ -22,15 +24,24 @@ const props = withDefaults(defineProps<{
 const iconOnly = computed(() => !!props.icon && !!props.label)
 const inactive = computed(() => props.disabled || props.loading)
 const iconSize = computed(() => (props.size === 'sm' ? 14 : props.size === 'lg' ? 20 : 16))
+
+const routerLink = resolveDynamicComponent('RouterLink')
+const link = computed(() => {
+  if (inactive.value) return null
+  if (props.to != null) {
+    return typeof routerLink !== 'string' ? { is: routerLink, bind: { to: props.to } } : { is: 'a', bind: { href: typeof props.to === 'string' ? props.to : '#' } }
+  }
+  return props.href ? { is: 'a', bind: { href: props.href, target: props.target, rel: props.target === '_blank' ? 'noopener' : undefined } } : null
+})
 </script>
 
 <template>
-  <a v-if="href && !inactive" class="fabric-button" :class="[variant, size, { block, 'icon-only': iconOnly }]" :href="href" :target="target"
-    :rel="target === '_blank' ? 'noopener' : undefined" :aria-label="iconOnly ? label : undefined" :title="iconOnly ? label : undefined">
+  <component :is="link.is" v-if="link" v-bind="link.bind" class="fabric-button" :class="[variant, size, { block, 'icon-only': iconOnly }]"
+    :aria-label="iconOnly ? label : undefined" :title="iconOnly ? label : undefined">
     <FabricIcon v-if="icon" :name="icon" :size="iconSize" />
     <span v-if="!iconOnly" class="text"><slot /></span>
     <FabricIcon v-if="iconAfter" :name="iconAfter" :size="iconSize" />
-  </a>
+  </component>
   <button v-else class="fabric-button" :class="[variant, size, { block, loading, 'icon-only': iconOnly }]" :type="type"
     :disabled="inactive" :aria-busy="loading || undefined" :aria-label="iconOnly ? label : undefined" :title="iconOnly ? label : undefined">
     <FabricSpinner v-if="loading" class="spinner" :size="iconSize" />

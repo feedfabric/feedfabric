@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 
 // A score from 0 to 1 against the line where something happens, like a classifier's score and the threshold it
-// acts at. At or past the threshold it turns the threshold's tone; within warnWithin of it, it warns.
+// acts at. At or past the threshold it turns the threshold's tone; within warnWithin of it, it warns. format, when
+// given, writes both the value and the threshold, so they're in the same units.
 const props = withDefaults(defineProps<{
   value: number
   label: string
@@ -14,7 +15,10 @@ const props = withDefaults(defineProps<{
 }>(), { threshold: null, tone: 'bad', warnWithin: 0.15 })
 
 const percent = (v: number) => `${Math.max(0, Math.min(1, v)) * 100}%`
-const shown = computed(() => (props.format ? props.format(props.value) : props.value.toFixed(2)))
+const write = (v: number) => (props.format ? props.format(v) : String(Number(v.toFixed(4))))
+const shown = computed(() => write(props.value))
+// Near either end the threshold's label sits on its inner side, so it never runs into the 0 or 1
+const markSide = computed(() => (props.threshold == null ? 'middle' : props.threshold < 0.15 ? 'low' : props.threshold > 0.85 ? 'high' : 'middle'))
 const state = computed(() => {
   if (props.threshold == null) return 'accent'
   if (props.value >= props.threshold) return props.tone
@@ -33,9 +37,9 @@ const state = computed(() => {
       <div v-if="threshold != null" class="threshold" :style="{ left: percent(threshold) }" />
     </div>
     <div v-if="threshold != null" class="scale">
-      <span>0</span>
-      <span class="mark" :style="{ left: percent(threshold) }">{{ thresholdLabel ?? `acts at ${threshold}` }}</span>
-      <span>1</span>
+      <span :class="{ covered: markSide === 'low' }">0</span>
+      <span class="mark" :class="markSide" :style="{ left: percent(threshold) }">{{ thresholdLabel ?? `acts at ${write(threshold)}` }}</span>
+      <span :class="{ covered: markSide === 'high' }">1</span>
     </div>
   </div>
 </template>
@@ -50,6 +54,9 @@ const state = computed(() => {
 .threshold { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--fabric-ink); border-radius: 1px; }
 .scale { position: relative; display: flex; justify-content: space-between; height: 16px; font-size: 11px; color: var(--fabric-muted); }
 .mark { position: absolute; transform: translateX(-50%); white-space: nowrap; color: var(--fabric-ink); }
+.mark.low { transform: translateX(-2px); }
+.mark.high { transform: translateX(calc(-100% + 2px)); }
+.covered { visibility: hidden; }
 .accent { --strong: var(--fabric-accent); }
 .good { --strong: var(--fabric-good); }
 .warn { --strong: var(--fabric-warn); }

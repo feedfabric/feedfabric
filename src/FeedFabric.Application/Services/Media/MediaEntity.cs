@@ -29,6 +29,10 @@ public class MediaEntity : EntityBase
     // Set when Rejected; one of MediaRejections
     public string? RejectionReason { get; set; }
 
+    // The nudity classifier's score for the rebuilt image (0 to 1), whatever it decided. Staff only (GET /admin/media/{id}):
+    // telling uploaders would let them probe for the threshold.
+    public double? NudityScore { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? ProcessedAt { get; set; }

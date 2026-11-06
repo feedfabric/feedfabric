@@ -66,7 +66,9 @@ public class MediaProcessor(
 
         // On the rebuilt image, so the classifier only ever sees clean pixels. Like the malware scan, there's no way
         // round it: without the model this throws, the consumer retries, and the photo stays in quarantine.
-        var nudityScore = await nudity.ScoreAsync(image.Large.Data, cancellationToken);
+        // Rounded once and used for the decision, the stored score and the log alike, so none of them disagree
+        var nudityScore = Math.Round(await nudity.ScoreAsync(image.Large.Data, cancellationToken), 3);
+        media.NudityScore = nudityScore;
         if (nudityScore >= moderation.Value.NudityRejectAt)
         {
             db.ModerationEvents.Add(new ModerationEventEntity
@@ -74,7 +76,7 @@ public class MediaProcessor(
                 UserId = media.OwnerId,
                 Kind = "photo",
                 Category = ModerationCategories.Nudity,
-                Score = Math.Round(nudityScore, 3),
+                Score = nudityScore,
                 CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             });
             logger.LogWarning("Media {MediaId} from {OwnerId} rejected for nudity ({Score:0.00})", media.Id, media.OwnerId, nudityScore);

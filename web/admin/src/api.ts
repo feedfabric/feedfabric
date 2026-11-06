@@ -2,7 +2,7 @@ import { session } from './session'
 import type {
   AdminPost, AdminPostDetail, AdminReport, AdminUser, AdminUserDetail, ContentState, Dashboard, Decision, ForYouFeed, LogEntry, Me,
   ModerationAction, ModerationOverview, Page, ProfileDetail, ProfileError, ProfileSummary, ProfileVersion, RankingProfile, RankingVocabulary,
-  ReviewItem, SystemInfo, UserRef, UserStatus,
+  ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost,
 } from './types'
 
 export class ApiError extends Error {
@@ -41,6 +41,7 @@ function describe(status: number, code: string | undefined, what: string): strin
   if (status === 403) return "This account doesn't have the staff role this page needs."
   if (code === 'post.not_found' || code === 'comment.not_found') return 'It was deleted before you got to it.'
   if (code === 'user.not_found') return 'No such user.'
+  if (code === 'media.not_ready') return 'A photo is still being checked, or was rejected. Remove it or wait.'
   return `${what} failed: ${status}${code ? ` ${code}` : ''}`
 }
 
@@ -112,4 +113,25 @@ export const api = {
   previewProfile: (settings: RankingProfile, viewerId: string, limit = 30) =>
     request<ForYouFeed>(`/ranking/preview?viewer=${id(viewerId)}&limit=${limit}`, 'POST', settings),
   vocabulary: () => request<RankingVocabulary>('/ranking/vocabulary'),
+
+  // Posting as the signed-in user, through the endpoints members use: get an upload slot, PUT the file there
+  // (uploadFile), complete it, poll until the worker has checked it, then post with the ready images
+  createUpload: (contentType: string, size: number) => request<Upload>('/media/uploads', 'POST', { contentType, size }),
+  completeUpload: (mediaId: string) => request<MediaStatus>(`/media/${id(mediaId)}/complete`, 'POST'),
+  media: (mediaId: string) => request<MediaStatus>(`/media/${id(mediaId)}`),
+  adminMedia: (mediaId: string) => request<AdminMedia>(`/admin/media/${id(mediaId)}`),
+  createPost: (content: string, mediaIds: string[]) => request<CreatedPost>('/userfeed/posts', 'POST', { content, mediaIds }),
+}
+
+// PUTs a file to an upload URL, reporting progress (fetch can't report upload progress yet)
+export function uploadFile(url: string, file: Blob, contentType: string, onProgress: (percent: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', url)
+    xhr.setRequestHeader('Content-Type', contentType)
+    xhr.upload.onprogress = e => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100))
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new ApiError(xhr.status, undefined, `Upload failed: ${xhr.status}`)))
+    xhr.onerror = () => reject(new Error('Upload failed: network error'))
+    xhr.send(file)
+  })
 }
