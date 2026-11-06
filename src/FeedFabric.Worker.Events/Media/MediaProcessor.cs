@@ -41,7 +41,8 @@ public class MediaProcessor(
 
         if (scanning.Value.Enabled)
         {
-            var scan = await scanner.ScanAsync(new MemoryStream(data, writable: false), cancellationToken);
+            using var content = new MemoryStream(data, writable: false);
+            var scan = await scanner.ScanAsync(content, cancellationToken);
             if (!scan.IsClean)
             {
                 logger.LogWarning("Malware {Signature} in media {MediaId} uploaded by {OwnerId}", scan.Signature, media.Id, media.OwnerId);
