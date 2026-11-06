@@ -267,7 +267,7 @@ export interface RankerModelInfo {
 }
 
 export interface FeedExperiment {
-  feed: 'foryou' | 'following'
+  feed: 'foryou' | 'following' | 'favourites'
   served: number
   seen: number
   openRate: number
@@ -348,7 +348,7 @@ export interface ProfileExperiment {
 
 // Ranking profiles: src/FeedFabric.Application/Services/Ranking/Profiles/RankingProfile.cs
 export type ScoringMode = 'model' | 'formula' | 'expression' | 'newest'
-export type BoostMatch = 'tag' | 'author' | 'hasMedia' | 'following' | 'notFollowing'
+export type BoostMatch = 'tag' | 'author' | 'hasMedia' | 'following' | 'notFollowing' | 'favourite'
 export interface SourceSetting { enabled: boolean; limit: number }
 export interface Goals { open: number; like: number; comment: number; longRead: number; skip: number }
 export interface BoostRule { match: BoostMatch; value: string | null; multiplier: number }

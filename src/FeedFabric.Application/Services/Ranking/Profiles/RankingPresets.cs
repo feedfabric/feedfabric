@@ -1,9 +1,12 @@
 namespace FeedFabric.Application.Services.Ranking.Profiles;
 
-// Ready-made profiles: read-only, always available, and the starting point for your own ("Save as")
+// Ready-made profiles: read-only, always available, and the starting point for your own ("Save as"). All but Newest
+// first lift people's favourites, as Facebook does.
 public static class RankingPresets
 {
     public const string Balanced = "balanced";
+
+    private static BoostRule Favourites(double multiplier = 1.5) => new() { Match = BoostMatch.Favourite, Multiplier = multiplier };
 
     public static readonly IReadOnlyDictionary<string, Func<RankingProfile>> All = new Dictionary<string, Func<RankingProfile>>
     {
@@ -11,6 +14,7 @@ public static class RankingPresets
         {
             Name = "Balanced",
             Description = "The default: people you follow plus the best of everything else, ranked by the trained model.",
+            Boosts = [Favourites()],
         },
 
         ["community"] = () => new RankingProfile
@@ -19,7 +23,7 @@ public static class RankingPresets
             Description = "Conversation first: posts people reply to, from people you know and people like you.",
             Scoring = new ScoringSettings { Goals = new Goals { Open = 0.3, Like = 0.8, Comment = 5, LongRead = 2, Skip = -1.5 } },
             Sources = new SourceSettings { SimilarMeaning = new SourceSetting { Limit = 50 } },
-            Boosts = [new BoostRule { Match = BoostMatch.Following, Multiplier = 1.3 }],
+            Boosts = [new BoostRule { Match = BoostMatch.Following, Multiplier = 1.3 }, Favourites()],
         },
 
         ["discovery"] = () => new RankingProfile
@@ -37,6 +41,7 @@ public static class RankingPresets
             },
             Variety = new VarietySettings { AuthorCap = 1, OutOfNetwork = 5 },
             Exploration = new ExplorationSettings { Slots = 2, FromRank = 20 },
+            Boosts = [Favourites(1.2)],
         },
 
         ["following-first"] = () => new RankingProfile
@@ -50,7 +55,7 @@ public static class RankingPresets
                 SimilarMeaning = new SourceSetting { Limit = 30 },
             },
             Variety = new VarietySettings { OutOfNetwork = 1 },
-            Boosts = [new BoostRule { Match = BoostMatch.Following, Multiplier = 2 }],
+            Boosts = [new BoostRule { Match = BoostMatch.Following, Multiplier = 2 }, Favourites(2)],
         },
 
         ["fresh"] = () => new RankingProfile
@@ -64,6 +69,7 @@ public static class RankingPresets
             },
             Freshness = new FreshnessSettings { MaxAgeHours = 48 },
             Sources = new SourceSettings { LookbackHours = 6 },
+            Boosts = [Favourites()],
         },
 
         ["newest"] = () => new RankingProfile

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Follows;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
@@ -23,6 +24,8 @@ public class AppDbContext : DbContext
     public DbSet<PostEntity> Posts => Set<PostEntity>();
 
     public DbSet<FollowEntity> Follows => Set<FollowEntity>();
+
+    public DbSet<FavouriteEntity> Favourites => Set<FavouriteEntity>();
 
     public DbSet<LikeEntity> Likes => Set<LikeEntity>();
 
@@ -84,6 +87,22 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<FollowEntity>()
             .HasKey(f => new { f.FollowerId, f.FolloweeId });
+
+        // The key serves "my favourites"; nothing asks who favourited someone, so there's no reverse index
+        modelBuilder.Entity<FavouriteEntity>()
+            .HasKey(f => new { f.UserId, f.FavouriteId });
+
+        modelBuilder.Entity<FavouriteEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(f => f.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FavouriteEntity>()
+            .HasOne<UserEntity>()
+            .WithMany()
+            .HasForeignKey(f => f.FavouriteId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Serves fan-out: "followers of this author", paged by FollowerId
         modelBuilder.Entity<FollowEntity>()

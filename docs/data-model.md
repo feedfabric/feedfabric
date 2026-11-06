@@ -179,6 +179,17 @@ High volume: keep it in an analytics store (e.g. ClickHouse) or Kafka, not the m
 | FolloweeId | `Guid` | Separate index for follower lists |
 | CreatedAt | `DateTime` | |
 
+### Favourite
+
+Up to 30 accounts someone never wants to miss. Their recent posts are always For You candidates, the `favourite`
+boost lifts them (on in every preset but Newest first), and they make up `GET /userfeed/favourites`.
+
+| Field | Type | Notes |
+|---|---|---|
+| UserId | `Guid` | Composite key with FavouriteId |
+| FavouriteId | `Guid` | Needn't be someone UserId follows |
+| CreatedAt | `DateTime` | |
+
 ### Block
 
 | Field | Type | Notes |

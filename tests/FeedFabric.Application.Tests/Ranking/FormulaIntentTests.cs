@@ -143,19 +143,22 @@ public class FormulaIntentTests
     }
 
     [Fact]
-    public void Boosts_match_tags_authors_photos_and_follows()
+    public void Boosts_match_tags_authors_photos_follows_and_favourites()
     {
         var row = new double[RankingFeatures.Names.Length];
         row[RankingFeatures.Index("has_media")] = 1;
         row[RankingFeatures.Index("follows_author")] = 1;
         var post = Response("runs_14", "running");
+        var noFavourites = new HashSet<Guid>();
 
-        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Tag, Value = "running" }, post, row));
-        Assert.False(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Tag, Value = "yoga" }, post, row));
-        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Author, Value = "runs_14" }, post, row));
-        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.HasMedia }, post, row));
-        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Following }, post, row));
-        Assert.False(ProfileRules.Matches(new BoostRule { Match = BoostMatch.NotFollowing }, post, row));
+        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Tag, Value = "running" }, post, row, noFavourites));
+        Assert.False(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Tag, Value = "yoga" }, post, row, noFavourites));
+        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Author, Value = "runs_14" }, post, row, noFavourites));
+        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.HasMedia }, post, row, noFavourites));
+        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Following }, post, row, noFavourites));
+        Assert.False(ProfileRules.Matches(new BoostRule { Match = BoostMatch.NotFollowing }, post, row, noFavourites));
+        Assert.False(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Favourite }, post, row, noFavourites));
+        Assert.True(ProfileRules.Matches(new BoostRule { Match = BoostMatch.Favourite }, post, row, new HashSet<Guid> { post.AuthorId }));
     }
 
     [Fact]

@@ -257,6 +257,9 @@ public enum BoostMatch
     Following,
     [JsonStringEnumMemberName("notFollowing")]
     NotFollowing,
+    // By one of the viewer's favourites (FavouriteService)
+    [JsonStringEnumMemberName("favourite")]
+    Favourite,
 }
 
 // Multiplies the score of posts that match: 1.5 lifts them, 0.5 lowers them, 0 sinks them to the bottom

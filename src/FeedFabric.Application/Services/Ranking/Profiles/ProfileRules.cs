@@ -30,13 +30,15 @@ public static class ProfileRules
         return filters.OnlyTags.Count == 0 || post.Tags.Any(t => filters.OnlyTags.Contains(t.Tag));
     }
 
-    public static bool Matches(BoostRule boost, HomeFeedPostResponse post, double[] row) => boost.Match switch
+    // favourites: the viewer's favourites' user IDs, for BoostMatch.Favourite
+    public static bool Matches(BoostRule boost, HomeFeedPostResponse post, double[] row, IReadOnlySet<Guid> favourites) => boost.Match switch
     {
         BoostMatch.Tag => post.Tags.Any(t => t.Tag == boost.Value),
         BoostMatch.Author => post.AuthorUsername == boost.Value,
         BoostMatch.HasMedia => row[HasMedia] > 0,
         BoostMatch.Following => row[Follows] > 0,
         BoostMatch.NotFollowing => row[Follows] == 0,
+        BoostMatch.Favourite => favourites.Contains(post.AuthorId),
         _ => false,
     };
 
@@ -47,6 +49,7 @@ public static class ProfileRules
         BoostMatch.HasMedia => "Has photos",
         BoostMatch.Following => "From someone you follow",
         BoostMatch.NotFollowing => "From someone you don't follow",
+        BoostMatch.Favourite => "From one of your favourites",
         _ => "",
     } + $" (×{boost.Multiplier:0.##})";
 
