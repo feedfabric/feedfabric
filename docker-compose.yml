@@ -69,6 +69,7 @@ services:
       ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       BlobStorage__Local__Root: /blobs
+      MalwareScanning__Enabled: ${MALWARE_SCANNING_ENABLED:-true}
     volumes:
       - blobs:/blobs
     ports:
@@ -95,6 +96,7 @@ services:
       ConnectionStrings__Redis: redis:6379
       Kafka__BootstrapServers: kafka:29092
       BlobStorage__Local__Root: /blobs
+      MalwareScanning__Enabled: ${MALWARE_SCANNING_ENABLED:-true}
       MalwareScanning__ClamAv__Host: clamav
     volumes:
       - blobs:/blobs
@@ -129,6 +131,7 @@ services:
 
   # Malware scanner. Every upload is scanned before it can be published; while this is down, uploads wait in
   # quarantine. The first start downloads the virus database (a few minutes); the volume keeps it after that.
+  # Not needed with MALWARE_SCANNING_ENABLED=false in .env.
   clamav:
     image: clamav/clamav-debian:1.4
     restart: always

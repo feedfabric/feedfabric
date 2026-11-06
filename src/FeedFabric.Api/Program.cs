@@ -22,6 +22,7 @@ using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Ranking.Profiles;
 using FeedFabric.Application.Services.Safety;
+using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using FeedFabric.Application.Services.Tags;
 using FeedFabric.Application.Services.Users;
@@ -61,6 +62,8 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IMentionService, MentionService>();
 builder.Services.AddBlobStorage(builder.Configuration);
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.Section));
+// Only read for the admin panel; the worker does the scanning
+builder.Services.Configure<MalwareScanningOptions>(builder.Configuration.GetSection(MalwareScanningOptions.Section));
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IImpressionService, ImpressionService>();
 builder.Services.AddScoped<FeedLog>();

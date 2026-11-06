@@ -53,7 +53,7 @@ impressions and dwell, and `POST /ranking/preview`. Returns 429 Problem Details 
   for that key, or document why order doesn't matter for those events.
 
 ### 7. Health checks
-`/health/live` and `/health/ready` on the API and the worker: Postgres, Redis, Kafka, ClamAV and models loaded.
+`/health/live` and `/health/ready` on the API and the worker: Postgres, Redis, Kafka, ClamAV (when `MalwareScanning:Enabled`) and models loaded.
 Add `HEALTHCHECK` to the Dockerfiles or probes to the deployment.
 
 ### 8. Migrations as a deploy step

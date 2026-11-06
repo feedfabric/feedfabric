@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Media;
@@ -54,6 +55,12 @@ builder.Services.AddHostedService<MediaEventsConsumer>();
 builder.Services.AddHostedService<PostEmbeddingsConsumer>();
 
 var host = builder.Build();
+
+if (!host.Services.GetRequiredService<IOptions<MalwareScanningOptions>>().Value.Enabled)
+{
+    host.Services.GetRequiredService<ILogger<Program>>()
+        .LogWarning("Malware scanning is off (MalwareScanning:Enabled=false): uploads are published without a ClamAV scan");
+}
 
 await KafkaTopics.EnsureCreatedAsync(kafkaOptions);
 await host.RunAsync();
