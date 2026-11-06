@@ -112,13 +112,14 @@ services:
         - action: rebuild
           path: ./src
 
-  # Only starts with `make simulate`: seeds users and follows, then posts on a timer
+  # Only starts with `make simulate`: seeds users and follows and backfills history, then stops (or posts on a timer with Simulator__Live=true)
   simulator:
     profiles: ["sim"]
     build:
       context: .
       dockerfile: src/FeedFabric.Simulator/Dockerfile
-    restart: unless-stopped
+    # It stops by itself after the backfill unless Simulator__Live is true
+    restart: on-failure
     environment:
       DOTNET_ENVIRONMENT: Development
       ConnectionStrings__Default: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
