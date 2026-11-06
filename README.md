@@ -68,6 +68,7 @@ flowchart LR
 | `src/FeedFabric.Worker.Events` | Outbox publisher and Kafka consumers: fan-out, engagement, media scanning, embeddings |
 | `src/FeedFabric.Simulator` | Seeds users, backfills conversations, and posts, reads and engages in real time |
 | `web/admin` | Vue 3 admin panel: dashboard, moderation, users, posts, Feed studio and system settings |
+| `web/fabric-ui` | FabricUI: the Vue 3 components and design tokens the admin panel is built with |
 | `ml/` | Ranker training, synthetic conversation generator and model downloads (Python, `uv`) |
 | `tests/` | xUnit tests |
 

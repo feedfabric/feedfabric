@@ -174,16 +174,18 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
       <div class="grid two">
         <EChart :option="experimentOption" :height="220" label="For you against Following: share of posts seen that were engaged with, opened, liked and commented on"
           :summary="experimentSummary" />
-        <table class="compare">
-          <thead><tr><th /><th v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ feedLabel(r.feed) }}</th></tr></thead>
-          <tbody>
-            <tr><td>Posts served</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ fmt(r.served) }}</td></tr>
-            <tr><td>Seen</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ fmt(r.seen) }}</td></tr>
-            <tr><td>Engaged per seen</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num"><strong>{{ r.engagementRate }}%</strong></td></tr>
-            <tr><td>Average dwell</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ r.averageDwellSeconds == null ? '–' : `${r.averageDwellSeconds}s` }}</td></tr>
-            <tr><td>Shown from same persona</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ r.samePersonaShownShare == null ? '–' : `${r.samePersonaShownShare}%` }}</td></tr>
-          </tbody>
-        </table>
+        <div class="table-wrap">
+          <table class="compare">
+            <thead><tr><th /><th v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ feedLabel(r.feed) }}</th></tr></thead>
+            <tbody>
+              <tr><td>Posts served</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ fmt(r.served) }}</td></tr>
+              <tr><td>Seen</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ fmt(r.seen) }}</td></tr>
+              <tr><td>Engaged per seen</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num"><strong>{{ r.engagementRate }}%</strong></td></tr>
+              <tr><td>Average dwell</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ r.averageDwellSeconds == null ? '–' : `${r.averageDwellSeconds}s` }}</td></tr>
+              <tr><td>Shown from same persona</td><td v-for="r in ranking?.experiment ?? []" :key="r.feed" class="num">{{ r.samePersonaShownShare == null ? '–' : `${r.samePersonaShownShare}%` }}</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
       <p v-if="data && !ranking?.experiment.length" class="muted">No feeds served in this window yet.</p>
     </section>
@@ -194,23 +196,25 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
         The same population, split between profiles: list them in <code>Simulator:ForYouProfiles</code>. Change one in the
         <RouterLink to="/studio" class="link">Feed studio</RouterLink>; each saved version is counted separately.
       </p>
-      <table class="compare">
-        <thead><tr><th>Profile</th><th class="num">Seen</th><th class="num">Engaged</th><th class="num">Opened</th><th class="num">Liked</th>
-          <th class="num">Commented</th><th class="num">Not interested</th><th class="num">Show more</th><th class="num">Dwell</th></tr></thead>
-        <tbody>
-          <tr v-for="p in ranking.profiles" :key="p.profile">
-            <td><RouterLink :to="{ name: 'studio', params: { key: p.profile.split('@')[0] } }" class="link">{{ p.profile }}</RouterLink></td>
-            <td class="num">{{ fmt(p.seen) }}</td>
-            <td class="num"><strong>{{ p.engagementRate }}%</strong></td>
-            <td class="num">{{ p.openRate }}%</td>
-            <td class="num">{{ p.likeRate }}%</td>
-            <td class="num">{{ p.commentRate }}%</td>
-            <td class="num">{{ p.notInterestedRate }}%</td>
-            <td class="num">{{ p.showMoreRate }}%</td>
-            <td class="num">{{ p.averageDwellSeconds == null ? '–' : `${p.averageDwellSeconds}s` }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table class="compare">
+          <thead><tr><th>Profile</th><th class="num">Seen</th><th class="num">Engaged</th><th class="num">Opened</th><th class="num">Liked</th>
+            <th class="num">Commented</th><th class="num">Not interested</th><th class="num">Show more</th><th class="num">Dwell</th></tr></thead>
+          <tbody>
+            <tr v-for="p in ranking.profiles" :key="p.profile">
+              <td><RouterLink :to="{ name: 'studio', params: { key: p.profile.split('@')[0] } }" class="link">{{ p.profile }}</RouterLink></td>
+              <td class="num">{{ fmt(p.seen) }}</td>
+              <td class="num"><strong>{{ p.engagementRate }}%</strong></td>
+              <td class="num">{{ p.openRate }}%</td>
+              <td class="num">{{ p.likeRate }}%</td>
+              <td class="num">{{ p.commentRate }}%</td>
+              <td class="num">{{ p.notInterestedRate }}%</td>
+              <td class="num">{{ p.showMoreRate }}%</td>
+              <td class="num">{{ p.averageDwellSeconds == null ? '–' : `${p.averageDwellSeconds}s` }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <div class="grid two">
@@ -382,7 +386,7 @@ th button { color: inherit; font-weight: inherit; }
 .rows.plain li { padding: 6px 0; }
 .compare td, .compare th { white-space: nowrap; }
 .rows li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--line); font-size: 13.5px; }
-.rows li .text { flex: 1; white-space: nowrap; }
+.rows li .text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cap { text-transform: capitalize; }
 .badge { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--line); }
 .badge.ok { background: var(--accent-soft); color: var(--accent); }
