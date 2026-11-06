@@ -9,6 +9,7 @@ using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Safety;
+using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using FeedFabric.Application.Services.Users;
 
@@ -70,7 +71,7 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
     [HttpGet("system")]
     [Authorize(Policy = AdminPolicies.Staff)]
     public async Task<object> System(AppDbContext db, IBlobStorage storage, RankerModel ranker, IOptions<AuthOptions> auth,
-        IOptions<ModerationOptions> moderation, IOptions<MediaOptions> mediaOptions, TimeProvider timeProvider, CancellationToken cancellationToken)
+        IOptions<ModerationOptions> moderation, IOptions<MediaOptions> mediaOptions, IOptions<MalwareScanningOptions> scanning, TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var models = new List<object>();
@@ -129,7 +130,11 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
                 BlockedTerms = m.BlockedTerms.Count,
             },
             // What uploads may be, so the admin panel checks the same limits the server does
-            Media = new { mediaOptions.Value.MaxPerPost, mediaOptions.Value.MaxUploadBytes, AllowedTypes = MediaOptions.AllowedContentTypes },
+            Media = new
+            {
+                mediaOptions.Value.MaxPerPost, mediaOptions.Value.MaxUploadBytes, AllowedTypes = MediaOptions.AllowedContentTypes,
+                MalwareScanning = scanning.Value.Enabled,
+            },
             Models = models,
             Ranker = ranker.Info is { } info
                 ? new { Loaded = true, info.Version, info.TrainedAt, info.TrainingRows }

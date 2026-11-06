@@ -11,12 +11,13 @@ namespace FeedFabric.Worker.Events.Media;
 // Checks an upload in quarantine and either publishes a rebuilt copy or rejects it. In order: size, malware scan,
 // real file type from its bytes, decode and rebuild, then the nudity check on the rebuilt image. Every upload is scanned, even ones about to fail the type
 // check, so attacks are always logged; and the scan runs before any image decoder touches the file. There is no path
-// to Ready that skips it: if the scanner can't answer, this throws, the consumer retries, and the image stays in
-// quarantine.
+// to Ready that skips it while scanning is on (MalwareScanning:Enabled): if the scanner can't answer, this throws, the
+// consumer retries, and the image stays in quarantine.
 public class MediaProcessor(
     AppDbContext db,
     IBlobStorage storage,
     IMalwareScanner scanner,
+    IOptions<MalwareScanningOptions> scanning,
     NudityClassifier nudity,
     IOptions<ModerationOptions> moderation,
     IOptions<MediaOptions> options,
@@ -38,12 +39,15 @@ public class MediaProcessor(
             return;
         }
 
-        var scan = await scanner.ScanAsync(new MemoryStream(data, writable: false), cancellationToken);
-        if (!scan.IsClean)
+        if (scanning.Value.Enabled)
         {
-            logger.LogWarning("Malware {Signature} in media {MediaId} uploaded by {OwnerId}", scan.Signature, media.Id, media.OwnerId);
-            await RejectAsync(media, MediaRejections.MalwareDetected, cancellationToken);
-            return;
+            var scan = await scanner.ScanAsync(new MemoryStream(data, writable: false), cancellationToken);
+            if (!scan.IsClean)
+            {
+                logger.LogWarning("Malware {Signature} in media {MediaId} uploaded by {OwnerId}", scan.Signature, media.Id, media.OwnerId);
+                await RejectAsync(media, MediaRejections.MalwareDetected, cancellationToken);
+                return;
+            }
         }
 
         var actualType = FileSniffer.Detect(data);

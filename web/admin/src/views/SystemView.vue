@@ -70,6 +70,11 @@ const limits = (values: Record<string, number>) => Object.entries(values).map(([
         <dt>Held for review</dt><dd>{{ limits(info.moderation.holdAt).join(', ') || '–' }}</dd>
         <dt>Held after</dt><dd>{{ info.moderation.reportsToHold }} reports from different people</dd>
         <dt>Photos refused at</dt><dd>nudity ≥ {{ info.moderation.nudityRejectAt }}</dd>
+        <dt>Malware scan</dt>
+        <dd>
+          <span class="chip" :class="info.media.malwareScanning ? 'good' : 'warn'">{{ info.media.malwareScanning ? 'ClamAV' : 'off' }}</span>
+          <span v-if="!info.media.malwareScanning" class="muted">photos are still checked and rebuilt</span>
+        </dd>
         <dt>Spam rules</dt><dd>more than {{ info.moderation.maxLinks }} links, or a character {{ info.moderation.maxRepeatedCharacters }}+ times in a row</dd>
         <dt>Blocked words</dt><dd>{{ fmt(info.moderation.blockedTerms) }} in the list</dd>
       </dl>

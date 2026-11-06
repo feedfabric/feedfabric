@@ -179,7 +179,7 @@ export interface SystemInfo {
     maxRepeatedCharacters: number
     blockedTerms: number
   }
-  media: { maxPerPost: number; maxUploadBytes: number; allowedTypes: string[] }
+  media: { maxPerPost: number; maxUploadBytes: number; allowedTypes: string[]; malwareScanning: boolean }
   models: SystemModel[]
   ranker: { loaded: boolean; version?: string; trainedAt?: string; trainingRows?: number }
   users: Record<string, number>
