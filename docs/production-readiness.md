@@ -62,7 +62,8 @@ out; document the order.
 
 ### 9. Production configuration and secrets
 - Fail fast at startup when `Auth:Jwt` is empty or a connection string is missing.
-- Document every setting as environment variables; secrets come from the platform's secret store, never config files.
+- Secrets come from the platform's secret store, never config files. Every setting and its environment variable is in
+  [configuration.md](configuration.md).
 - `AllowedHosts`, `ForwardedHeaders` and HSTS behind a proxy; a CORS policy for the admin panel's origin.
 - `BlobStorage:Provider` must be `S3` outside Development.
 
