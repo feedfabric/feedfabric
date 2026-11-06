@@ -11,7 +11,7 @@ public class FeedLogEntity : EntityBase
 
     public required Guid PostId { get; set; }
 
-    // FeedNames.Following or FeedNames.ForYou
+    // FeedNames.Following, FeedNames.ForYou or FeedNames.Favourites
     public required string Feed { get; set; }
 
     // What ordered the feed: "chronological", "heuristic", or "model:<version>"
@@ -57,4 +57,5 @@ public static class FeedNames
 {
     public const string Following = "following";
     public const string ForYou = "foryou";
+    public const string Favourites = "favourites";
 }

@@ -29,6 +29,8 @@
 - **Posts, comments, likes, reposts and follows**, with nested replies, `#hashtags`, inferred topics and `@mentions`.
 - **Following and For You feeds.** Following is a Redis timeline per user, filled by fan-out on write. For You draws candidates from four sources (network, popular in your topics, similar readers, similar meaning) and ranks them.
 - **A learned ranker.** LightGBM predicts five outcomes per post (open, like, comment, long read, skip), runs in C# through ONNX Runtime on CPU, and falls back to a scoring formula when no model is loaded.
+- **Favourites.** Up to 30 accounts someone never wants to miss: always considered for For You, lifted above everyone
+  else, and a feed of their own.
 - **Healthy feeds.** It caps posts per author and per topic in a row, adds exploration slots, and supports *Not interested* and *Show more*.
 - **Ranking profiles.** Every part of For You is a setting: sources, goals, your own scoring formula, freshness, variety, exploration, boosts and filters. Six presets come built in, and the **Feed studio** previews changes live before you save a new version.
 - **Content safety, all on your own servers:**
@@ -110,7 +112,7 @@ All routes need a bearer token from your identity provider: Auth0, Entra ID, Cog
 
 | Area | Routes |
 |---|---|
-| Feeds | `GET /userfeed/home` (Following), `GET /userfeed/foryou?profile=<key>`, `GET /userfeed` (your own posts) |
+| Feeds | `GET /userfeed/home` (Following), `GET /userfeed/foryou?profile=<key>`, `GET /userfeed/favourites`, `GET /userfeed` (your own posts) |
 | Posts | `POST /userfeed/posts`, `PUT`/`DELETE /userfeed/posts/{id}` |
 | Comments | `GET`/`POST /userfeed/posts/{id}/comments`, `GET /userfeed/comments/{id}/replies`, `DELETE /userfeed/comments/{id}` |
 | Likes | `PUT`/`DELETE /userfeed/posts/{id}/like` |
@@ -122,6 +124,7 @@ All routes need a bearer token from your identity provider: Auth0, Entra ID, Cog
 | Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested`, `POST /userfeed/posts/{id}/show-more` |
 | Tags and mentions | `GET /userfeed/tags/trending`, `GET /userfeed/tags/{tag}/posts`, `GET /userfeed/mentions` |
 | Follows | `PUT`/`DELETE /follows/{externalUserId}` |
+| Favourites | `GET /favourites`, `PUT`/`DELETE /favourites/{externalUserId}` (up to 30) |
 | Media | `POST /media/uploads`, `POST /media/{id}/complete`, `GET /media/{id}` |
 | Ranking profiles | `GET /ranking/profiles`, `GET`/`PUT`/`DELETE /ranking/profiles/{key}`, `GET /ranking/profiles/{key}/versions`, `POST /ranking/preview`, `GET /ranking/vocabulary` |
 
@@ -150,7 +153,7 @@ A profile is a named, versioned set of settings that decides how For You is put 
 | **Freshness** | An extra half-life on top of the ranker, and a maximum age |
 | **Variety** | Posts per author in any ten, the same topic in a row, a minimum from outside your follows, and the penalty for posts already seen |
 | **Exploration** | Slots per ten for posts the ranker wouldn't have picked, and how far down they come from |
-| **Boosts** | Multiply scores by tag, author, photos, or whether you follow the author (0 sinks a post) |
+| **Boosts** | Multiply scores by tag, author, photos, whether you follow the author, or whether they're one of your favourites (0 sinks a post) |
 | **Filters** | Leave out tags, show only some tags, photos only, a minimum number of likes |
 
 **Your own formula** is a small, safe expression language: it can only read the ranking signals and call the functions below, so a profile can't run anything else.

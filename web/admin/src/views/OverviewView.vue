@@ -86,7 +86,7 @@ function cell(p: DashboardPost, key: SortKey) {
 
 // Ranking: For You against Following on the same simulated population
 const ranking = computed(() => data.value?.ranking)
-const feedLabel = (feed: string) => (feed === 'foryou' ? 'For you' : 'Following')
+const feedLabel = (feed: string) => ({ foryou: 'For you', favourites: 'Favourites' } as Record<string, string>)[feed] ?? 'Following'
 const experimentOption = computed<EChartsOption>(() => {
   const rows = ranking.value?.experiment ?? []
   const metrics = [['Engaged', 'engagementRate'], ['Opened', 'openRate'], ['Liked', 'likeRate'], ['Commented', 'commentRate']] as const

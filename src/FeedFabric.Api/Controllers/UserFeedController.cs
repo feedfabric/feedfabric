@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FeedFabric.Api.Errors;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Posts;
 using FeedFabric.Application.Services.Ranking;
@@ -13,7 +14,8 @@ namespace FeedFabric.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("userfeed")]
-public class UserFeedController(IFeedService feedService, IHomeFeedService homeFeedService, ForYouService forYouService, RankingProfileStore profiles, IPostService postService, ICurrentUser currentUser) : ControllerBase
+public class UserFeedController(IFeedService feedService, IHomeFeedService homeFeedService, ForYouService forYouService, RankingProfileStore profiles, IPostService postService,
+    IFavouriteService favourites, ICurrentUser currentUser) : ControllerBase
 {
     // GET /userfeed?gt=&gte=&lt=&lte=&order=newest|oldest&limit=20, then add &cursor=<nextCursor> for the next page
     [HttpGet]
@@ -28,6 +30,14 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
     public async Task<ActionResult<HomeFeedResponse>> GetHomeFeed([FromQuery] HomeFeedQuery query, CancellationToken cancellationToken)
     {
         var feed = await homeFeedService.GetHomeFeedAsync(currentUser.ExternalUserId, query, cancellationToken);
+        return feed is null ? ToProblem(PostResultStatus.UserNotFound) : Ok(feed);
+    }
+
+    // GET /userfeed/favourites?limit=20, then add &cursor=<nextCursor>: newest first, only from your favourites
+    [HttpGet("favourites")]
+    public async Task<ActionResult<HomeFeedResponse>> GetFavouritesFeed([FromQuery] HomeFeedQuery query, CancellationToken cancellationToken)
+    {
+        var feed = await favourites.FeedAsync(currentUser.ExternalUserId, query, cancellationToken);
         return feed is null ? ToProblem(PostResultStatus.UserNotFound) : Ok(feed);
     }
 

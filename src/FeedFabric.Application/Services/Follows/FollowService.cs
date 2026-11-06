@@ -39,13 +39,11 @@ public class FollowService(AppDbContext db, TimeProvider timeProvider) : IFollow
 
     private async Task<(FollowResultStatus Status, Guid FollowerId, Guid FolloweeId)> FindUsersAsync(string externalUserId, string targetExternalUserId, CancellationToken cancellationToken)
     {
-        var followerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        var (followerId, followeeId) = await db.Users.FindPairAsync(externalUserId, targetExternalUserId, cancellationToken);
         if (followerId is null)
         {
             return (FollowResultStatus.UserNotFound, default, default);
         }
-
-        var followeeId = await db.Users.FindIdByExternalIdAsync(targetExternalUserId, cancellationToken);
         if (followeeId is null)
         {
             return (FollowResultStatus.TargetNotFound, default, default);

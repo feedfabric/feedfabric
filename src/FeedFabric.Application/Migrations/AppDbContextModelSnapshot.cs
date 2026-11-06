@@ -62,6 +62,24 @@ namespace FeedFabric.Application.Migrations
                     b.ToTable("Comments");
                 });
 
+            modelBuilder.Entity("FeedFabric.Application.Services.Favourites.FavouriteEntity", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FavouriteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId", "FavouriteId");
+
+                    b.HasIndex("FavouriteId");
+
+                    b.ToTable("Favourites");
+                });
+
             modelBuilder.Entity("FeedFabric.Application.Services.Follows.FollowEntity", b =>
                 {
                     b.Property<Guid>("FollowerId")
@@ -595,6 +613,21 @@ namespace FeedFabric.Application.Migrations
                     b.HasOne("PostEntity", null)
                         .WithMany()
                         .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FeedFabric.Application.Services.Favourites.FavouriteEntity", b =>
+                {
+                    b.HasOne("FeedFabric.Application.Services.Users.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FavouriteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FeedFabric.Application.Services.Users.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

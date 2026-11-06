@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Embeddings;
+using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
@@ -178,7 +179,8 @@ public class ForYouService(
     private async Task<Session> RankAsync(Guid viewerId, ResolvedProfile profile, CancellationToken cancellationToken)
     {
         var settings = profile.Settings;
-        var candidates = await CandidatesAsync(viewerId, settings, cancellationToken);
+        var favourites = await FavouriteService.IdsAsync(db, viewerId, cancellationToken);
+        var candidates = await CandidatesAsync(viewerId, settings, favourites, cancellationToken);
         var signals = await features.BuildAsync(viewerId, candidates, cancellationToken);
         candidates = candidates.Where(c => ProfileRules.Passes(c, signals[c.Id], settings.Filters)).ToList();
         var rows = candidates.Select(c => signals[c.Id]).ToList();
@@ -216,7 +218,7 @@ public class ForYouService(
             {
                 Apply("Freshness", Math.Pow(0.5, row[Age] / 60 / halfLife), $"Halves every {halfLife:0.##} hours");
             }
-            foreach (var boost in settings.Boosts.Where(b => ProfileRules.Matches(b, c, row)))
+            foreach (var boost in settings.Boosts.Where(b => ProfileRules.Matches(b, c, row, favourites)))
             {
                 Apply(boost.Multiplier >= 1 ? "Boosted" : "Lowered", boost.Multiplier, ProfileRules.Describe(boost));
             }
@@ -271,7 +273,8 @@ public class ForYouService(
         }
     }
 
-    private async Task<List<HomeFeedPostResponse>> CandidatesAsync(Guid viewerId, RankingProfile profile, CancellationToken cancellationToken)
+    private async Task<List<HomeFeedPostResponse>> CandidatesAsync(Guid viewerId, RankingProfile profile, IReadOnlySet<Guid> favourites,
+        CancellationToken cancellationToken)
     {
         var database = redis.GetDatabase();
         var sources = profile.Sources;
@@ -284,6 +287,17 @@ public class ForYouService(
         {
             var timeline = await database.SortedSetRangeByRankAsync(FeedKeys.ForUser(viewerId), 0, sources.Following.Limit - 1, Order.Descending);
             ids.UnionWith(timeline.Select(v => Guid.Parse(v.ToString())));
+        }
+
+        // Favourites' recent posts, whatever the profile's sources: whether or not the viewer follows them, and whether
+        // or not the timeline still holds them. Only live originals, so reposts and removed posts don't use up the limit.
+        if (favourites.Count > 0)
+        {
+            var favouriteIds = favourites.ToList();
+            var favouritesSince = now - TimeSpan.FromHours(Math.Max(sources.LookbackHours, FavouritesLookbackHours));
+            ids.UnionWith(await db.Posts.Where(p => favouriteIds.Contains(p.AuthorId) && p.CreatedAt >= favouritesSince
+                    && p.DeletedAt == null && p.Status == ContentStatus.Visible && p.RepostOfId == null)
+                .OrderByDescending(p => p.Id).Select(p => p.Id).Take(FavouritesLimit).ToListAsync(cancellationToken));
         }
 
         // 2. What's doing well right now on the topics they engage with most
@@ -350,6 +364,10 @@ public class ForYouService(
     private static string SessionKey(Guid viewerId, ResolvedProfile profile) => $"foryou:{viewerId}:{profile.Label}";
 
     private static string HiddenKey(Guid viewerId) => $"hidden:{viewerId}";
+
+    // Favourites' posts from at least the last two days, up to this many, whatever the profile's sources
+    private const double FavouritesLookbackHours = 48;
+    private const int FavouritesLimit = 100;
 
     // Post ID to the viewer's feedback on it (Feedback), kept as long as the hidden set
     private static string FeedbackKey(Guid viewerId) => $"feedback:{viewerId}";

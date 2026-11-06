@@ -42,6 +42,8 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `profile.invalid_key` | 400 | `profile` | Keys are 2–40 lowercase letters, digits and dashes, starting with a letter |
 | `user.not_found` | 404 | `externalUserId` | No user with that ID, e.g. when following |
 | `follow.self` | 400 | | Users can't follow themselves |
+| `favourite.self` | 400 | | Users can't make themselves a favourite |
+| `favourite.limit_reached` | 409 | `max` | Already at the most favourites allowed (30); remove one to add another |
 | `bad_request` | 400 | | Generic fallback |
 | `unauthorized` | 401 | | Missing or invalid token |
 | `forbidden` | 403 | | Generic fallback |

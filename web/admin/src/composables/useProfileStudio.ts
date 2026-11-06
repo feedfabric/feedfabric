@@ -221,4 +221,5 @@ export const BoostLabels = {
   hasMedia: 'Has photos',
   following: 'From people you follow',
   notFollowing: "From people you don't follow",
+  favourite: 'From one of your favourites',
 } as const

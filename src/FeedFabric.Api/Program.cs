@@ -11,6 +11,7 @@ using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Impressions;
+using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Follows;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Reposts;
@@ -52,6 +53,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 });
 builder.Services.AddScoped<IPostService, PostService>();
 builder.Services.AddScoped<IFollowService, FollowService>();
+builder.Services.AddScoped<IFavouriteService, FavouriteService>();
 builder.Services.AddScoped<ILikeService, LikeService>();
 builder.Services.AddScoped<IRepostService, RepostService>();
 builder.Services.AddScoped<ICommentService, CommentService>();

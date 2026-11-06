@@ -42,6 +42,11 @@ public static class ErrorCodes
     public const string UserNotFound = "user.not_found";
     public const string FollowSelf = "follow.self";
 
+    // Favourites
+    public const string FavouriteSelf = "favourite.self";
+    // Already at the most allowed; params: { max }
+    public const string FavouriteLimitReached = "favourite.limit_reached";
+
     // Ranking profiles
     public const string ProfileNotFound = "profile.not_found";
     // Presets can't be changed or deleted; save a copy under a new key
