@@ -31,19 +31,37 @@ public class HomeFeedService(
             return null;
         }
 
+        var feed = await ReadAsync(userId.Value, query, cancellationToken);
+        // Logged with the same signals as For You, so both feeds are training data and can be compared. A repost is
+        // logged as the post it shares, since that's what the viewer sees, likes and opens.
+        var shown = feed.Posts.Select(p => p.RepostOf ?? p).ToList();
+        var signals = await features.BuildAsync(userId.Value, shown, cancellationToken);
+        await feedLog.LogServedAsync(userId.Value, FeedNames.Following, "chronological",
+            shown.Select((p, i) => new ServedPost(p.Id, i, 0, signals[p.Id])).ToList(), cancellationToken);
+        return feed;
+    }
+
+    public async Task<HomeFeedResponse?> PeekAsync(string externalUserId, HomeFeedQuery query, CancellationToken cancellationToken)
+    {
+        var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        return userId is null ? null : await ReadAsync(userId.Value, query, cancellationToken);
+    }
+
+    private async Task<HomeFeedResponse> ReadAsync(Guid userId, HomeFeedQuery query, CancellationToken cancellationToken)
+    {
         // One extra post tells us whether there is another page
         var want = query.Limit + 1;
         List<HomeFeedPostResponse> posts;
         string source;
         try
         {
-            (posts, var exhausted) = await FromRedisAsync(userId.Value, query.Cursor, want, cancellationToken);
+            (posts, var exhausted) = await FromRedisAsync(userId, query.Cursor, want, cancellationToken);
             source = Redis;
             // Redis only holds the newest MaxLength entries; older pages continue from Postgres
-            if (exhausted && posts.Count < want && await IsTimelineFullAsync(userId.Value))
+            if (exhausted && posts.Count < want && await IsTimelineFullAsync(userId))
             {
                 var before = posts.Count > 0 ? posts[^1].Id : query.Cursor;
-                posts.AddRange(await FromPostgresAsync(userId.Value, before, want - posts.Count, cancellationToken));
+                posts.AddRange(await FromPostgresAsync(userId, before, want - posts.Count, cancellationToken));
                 source = posts.Count > 0 ? $"{Redis}+{Postgres}" : Postgres;
             }
         }
@@ -53,20 +71,13 @@ public class HomeFeedService(
             {
                 logger.LogWarning(ex, "Reading the home timeline from Redis failed; using Postgres");
             }
-            posts = await FromPostgresAsync(userId.Value, query.Cursor, want, cancellationToken);
+            posts = await FromPostgresAsync(userId, query.Cursor, want, cancellationToken);
             source = Postgres;
         }
 
         var page = posts.Take(query.Limit).ToList();
         await page.AttachRepostsAsync(db, cancellationToken);
         await page.AttachMediaAsync(media, cancellationToken);
-
-        // Logged with the same signals as For You, so both feeds are training data and can be compared. A repost is
-        // logged as the post it shares, since that's what the viewer sees, likes and opens.
-        var shown = page.Select(p => p.RepostOf ?? p).ToList();
-        var signals = await features.BuildAsync(userId.Value, shown, cancellationToken);
-        await feedLog.LogServedAsync(userId.Value, FeedNames.Following, "chronological",
-            shown.Select((p, i) => new ServedPost(p.Id, i, 0, signals[p.Id])).ToList(), cancellationToken);
         return new HomeFeedResponse
         {
             Posts = page,

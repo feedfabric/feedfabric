@@ -18,7 +18,7 @@ export default defineConfig({
   // Its own port, well clear of the simulator's 5173 (and the 5174, 5175… Vite falls back to when that's busy), and
   // strict, so a busy port is an error rather than the admin app quietly turning up somewhere else
   server: {
-    port: 5180,
+    port: 5185,
     strictPort: true,
     proxy: {
       '/admin': api,
@@ -28,6 +28,8 @@ export default defineConfig({
       // Posting from the panel uses the member endpoints
       '/media': api,
       '/userfeed': api,
+      // The API's live OpenAPI document (Development only), for the API reference page; the saved copy is public/openapi.json
+      '/openapi/': api,
     },
   },
   // A static site of its own, deployed apart from the member-facing app and served behind the same API

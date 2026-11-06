@@ -12,7 +12,14 @@ const route = useRoute()
 onMounted(loadMe)
 
 const sections = computed<SidebarSection[]>(() => [
-  { title: 'Overview', show: true, links: [{ to: '/overview', label: 'Dashboard', icon: 'chart' as const }] },
+  {
+    title: 'Overview',
+    show: true,
+    links: [
+      { to: '/overview', label: 'Dashboard', icon: 'chart' as const },
+      { to: '/feed', label: 'Feeds', icon: 'eye' as const },
+    ],
+  },
   {
     title: 'Moderation',
     show: !!me.value?.moderator,
@@ -32,7 +39,14 @@ const sections = computed<SidebarSection[]>(() => [
     ],
   },
   { title: 'Ranking', show: !!me.value?.rankingAdmin, links: [{ to: '/studio', label: 'Feed studio', icon: 'sparkle' as const }] },
-  { title: 'System', show: true, links: [{ to: '/system', label: 'Settings and models', icon: 'settings' as const }] },
+  {
+    title: 'System',
+    show: true,
+    links: [
+      { to: '/system', label: 'Settings and models', icon: 'settings' as const },
+      { to: '/api', label: 'API reference', icon: 'monitor' as const },
+    ],
+  },
 ].filter(s => s.show).map(({ title, links }) => ({ title, links })))
 
 const isDevelopment = computed(() => me.value?.environment === 'Development')

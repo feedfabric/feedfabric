@@ -2,7 +2,7 @@ import { session } from './session'
 import type {
   AdminPost, AdminPostDetail, AdminReport, AdminUser, AdminUserDetail, ContentState, Dashboard, Decision, ForYouFeed, LogEntry, Me,
   ModerationAction, ModerationOverview, Page, ProfileDetail, ProfileError, ProfileSummary, ProfileVersion, RankingProfile, RankingVocabulary,
-  ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost,
+  ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost, HomeFeed,
 } from './types'
 
 export class ApiError extends Error {
@@ -102,6 +102,12 @@ export const api = {
     request<void>(`/admin/users/${id(externalUserId)}/verified`, 'PUT', { verified }),
   posts: (search: PostSearch) => request<Page<AdminPost>>(`/admin/posts${query({ ...search })}`),
   post: (postId: string) => request<AdminPostDetail>(`/admin/posts/${id(postId)}`),
+
+  // Someone's feeds as they'd see them (staff). Not logged as served, and For You pages in a session of its own.
+  following: (externalUserId: string, cursor?: string | null, limit = 20) =>
+    request<HomeFeed>(`/admin/feed/${id(externalUserId)}/following${query({ cursor, limit })}`),
+  forYou: (externalUserId: string, cursor?: string | null, profile?: string | null, limit = 20) =>
+    request<ForYouFeed>(`/admin/feed/${id(externalUserId)}/foryou${query({ cursor, profile, limit })}`),
 
   // Ranking profiles (ranking admins)
   profiles: () => request<ProfileSummary[]>('/ranking/profiles'),

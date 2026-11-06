@@ -43,14 +43,8 @@ public class ForYouService(
             return null;
         }
 
-        var offset = int.TryParse(query.Cursor, out var o) && o > 0 ? o : 0;
-        var session = offset > 0 ? await LoadSessionAsync(viewerId.Value, profile) : null;
-        if (session is null)
-        {
-            session = await RankAsync(viewerId.Value, profile, cancellationToken);
-            await redis.GetDatabase().StringSetAsync(SessionKey(viewerId.Value, profile), JsonSerializer.Serialize(session), SessionLifetime);
-        }
-
+        var offset = Offset(query);
+        var session = await SessionAsync(viewerId.Value, offset, profile, SessionKey(viewerId.Value, profile), cancellationToken);
         var response = await PageAsync(session, offset, query.Limit, profile, cancellationToken);
         await feedLog.LogServedAsync(viewerId.Value, FeedNames.ForYou, session.Ranker,
             session.Posts.Skip(offset).Take(query.Limit).Select((p, i) => new ServedPost(p.PostId, offset + i, p.Score, p.Features, p.Explored, p.Propensity)).ToList(),
@@ -69,6 +63,34 @@ public class ForYouService(
         }
         var session = await RankAsync(viewerId.Value, profile, cancellationToken);
         return await PageAsync(session, 0, limit, profile, cancellationToken);
+    }
+
+    // What this viewer's For You shows, paged like theirs but in a session of its own and without logging it, so
+    // looking neither becomes training data nor reshuffles the order they're paging through: for staff
+    public async Task<ForYouResponse?> PeekAsync(string externalUserId, ForYouQuery query, ResolvedProfile profile, CancellationToken cancellationToken)
+    {
+        var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
+        if (viewerId is null)
+        {
+            return null;
+        }
+        var offset = Offset(query);
+        var session = await SessionAsync(viewerId.Value, offset, profile, PeekKey(viewerId.Value, profile), cancellationToken);
+        return await PageAsync(session, offset, query.Limit, profile, cancellationToken);
+    }
+
+    private static int Offset(ForYouQuery query) => int.TryParse(query.Cursor, out var o) && o > 0 ? o : 0;
+
+    // The first page ranks again; later pages keep the order kept under key, or rank again if it has expired
+    private async Task<Session> SessionAsync(Guid viewerId, int offset, ResolvedProfile profile, string key, CancellationToken cancellationToken)
+    {
+        var session = offset > 0 ? await LoadSessionAsync(key) : null;
+        if (session is null)
+        {
+            session = await RankAsync(viewerId, profile, cancellationToken);
+            await redis.GetDatabase().StringSetAsync(key, JsonSerializer.Serialize(session), SessionLifetime);
+        }
+        return session;
     }
 
     private async Task<ForYouResponse> PageAsync(Session session, int offset, int limit, ResolvedProfile profile, CancellationToken cancellationToken)
@@ -354,14 +376,16 @@ public class ForYouService(
             .ToFeedPosts(db).ToListAsync(cancellationToken);
     }
 
-    private async Task<Session?> LoadSessionAsync(Guid viewerId, ResolvedProfile profile)
+    private async Task<Session?> LoadSessionAsync(string key)
     {
-        var json = await redis.GetDatabase().StringGetAsync(SessionKey(viewerId, profile));
+        var json = await redis.GetDatabase().StringGetAsync(key);
         return json.HasValue ? JsonSerializer.Deserialize<Session>(json.ToString()) : null;
     }
 
     // Per profile version, so switching profiles (or saving a new version) never pages through another one's order
     private static string SessionKey(Guid viewerId, ResolvedProfile profile) => $"foryou:{viewerId}:{profile.Label}";
+
+    private static string PeekKey(Guid viewerId, ResolvedProfile profile) => $"foryou-peek:{viewerId}:{profile.Label}";
 
     private static string HiddenKey(Guid viewerId) => $"hidden:{viewerId}";
 
