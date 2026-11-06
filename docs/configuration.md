@@ -180,7 +180,8 @@ them.
 ## Simulator
 
 `Simulator:*` sets the simulated population and how it behaves: how many users and follows, how often they post, read,
-like and comment, the backfill on an empty platform, and the random seed. Each setting is described in
+like and comment, the backfill on an empty platform, whether it keeps running live after the backfill (`Simulator:Live`,
+off by default), and the random seed. Each setting is described in
 `src/FeedFabric.Simulator/SimulatorOptions.cs`, and the defaults are in the simulator's `appsettings.json`. The
 simulator never runs in production.
 
