@@ -199,6 +199,7 @@ Each simulated user has a main interest and one or two secondary interests. Even
 
 ## Docs
 
+- [Configuration](docs/configuration.md): every setting and environment variable, and which service reads it
 - [Data model](docs/data-model.md): every entity and field, and the event flow
 - [API errors](docs/errors.md): codes, statuses and validation errors
 
