@@ -40,6 +40,9 @@ Read-only, always available, and the starting point for your own.
 
 ## Your own formula
 
+The [Formulas](/formulas/) section explains every part of a score, the
+[whole language](/formulas/language/) and [recipes](/formulas/cookbook/); in brief:
+
 With `mode: "expression"`, `expression` is a small, safe language that can only read ranking signals and call a fixed
 set of functions, so a profile can't run anything else.
 

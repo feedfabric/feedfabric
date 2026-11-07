@@ -153,5 +153,8 @@ they're for.
 cd web/docs
 npm install
 npm run dev      # http://localhost:5186
-npm run build    # static site in web/docs/dist
+npm run build    # static site and search index in web/docs/dist
 ```
+
+[Contributing to the docs](/contributing/) explains how it's put together, and [Cloudflare](/deploy/cloudflare/#deploying-these-docs)
+how it's deployed. When you're ready to run FeedFabric for real members, go on to [Deploying FeedFabric](/deploy/).

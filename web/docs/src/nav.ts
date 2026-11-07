@@ -23,7 +23,15 @@ export const nav: NavSection[] = [
     ],
   },
   {
-    title: 'Integrate',
+    title: 'Formulas',
+    links: [
+      { label: 'How a score is made', href: '/formulas/' },
+      { label: 'Formula language', href: '/formulas/language/' },
+      { label: 'Formula cookbook', href: '/formulas/cookbook/' },
+    ],
+  },
+  {
+    title: 'Build a UI',
     links: [
       { label: 'Sign-in and users', href: '/auth/' },
       { label: 'Building a UI', href: '/build-a-ui/' },
@@ -32,6 +40,16 @@ export const nav: NavSection[] = [
       { label: 'Post cards and actions', href: '/build-a-ui/post-cards/' },
       { label: 'Composing with photos', href: '/build-a-ui/compose/' },
       { label: 'Reading signals', href: '/build-a-ui/signals/' },
+      { label: 'React and plain JavaScript', href: '/build-a-ui/react/' },
+      { label: 'A formula editor', href: '/build-a-ui/formula-editor/' },
+    ],
+  },
+  {
+    title: 'Deploy',
+    links: [
+      { label: 'Deploying FeedFabric', href: '/deploy/' },
+      { label: 'Cloudflare', href: '/deploy/cloudflare/' },
+      { label: 'Operating it', href: '/operating/' },
     ],
   },
   {
@@ -39,7 +57,12 @@ export const nav: NavSection[] = [
     links: [
       { label: 'API reference', href: '/api/' },
       { label: 'Errors', href: '/api/errors/' },
-      { label: 'Operating it', href: '/operating/' },
+    ],
+  },
+  {
+    title: 'Project',
+    links: [
+      { label: 'Contributing to the docs', href: '/contributing/' },
     ],
   },
 ]
