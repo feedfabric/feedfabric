@@ -6,6 +6,7 @@
     <Project Path="src/FeedFabric.Worker.Events/FeedFabric.Worker.Events.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/FeedFabric.Api.Tests/FeedFabric.Api.Tests.csproj" />
     <Project Path="tests/FeedFabric.Application.Tests/FeedFabric.Application.Tests.csproj" />
   </Folder>
 </Solution>

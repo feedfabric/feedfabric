@@ -13,6 +13,8 @@ public static class ErrorCodes
     public const string MethodNotAllowed = "method_not_allowed";
     public const string Conflict = "conflict";
     public const string UnsupportedMediaType = "unsupported_media_type";
+    // Over the request body limit (Kestrel:Limits:MaxRequestBodySize)
+    public const string RequestTooLarge = "request_too_large";
     public const string InternalError = "internal_error";
 
     // Users and posts
@@ -60,5 +62,7 @@ public static class ErrorCodes
     // Validation attributes put them in ErrorMessage, with params as ";name={n}" placeholders.
     public const string Required = "required";
     public const string OutOfRange = "out_of_range";
+    // Longer than allowed; params: { max } characters
+    public const string TooLong = "too_long";
     public const string InvalidValue = "invalid_value";
 }

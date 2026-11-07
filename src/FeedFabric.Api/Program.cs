@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
@@ -29,6 +30,9 @@ using FeedFabric.Application.Services.Users;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
+builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
 
 // Add services to the container.
 // Pooled: contexts are reset and reused across requests instead of being built for each one
@@ -122,7 +126,11 @@ if (app.Environment.IsDevelopment())
 }
 
 // Configure the HTTP request pipeline.
-app.UseExceptionHandler();
+// Kestrel's own refusals (a body over the limit is 413) keep their status rather than becoming a 500
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    StatusCodeSelector = exception => exception is Microsoft.AspNetCore.Http.BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError,
+});
 app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
@@ -152,3 +160,4 @@ app.MapGet("/me", (ICurrentUser currentUser) => new { currentUser.ExternalUserId
     .RequireAuthorization();
 
 app.Run();
+public partial class Program;

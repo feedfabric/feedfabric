@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.Features;
 using FeedFabric.Application.Services.Storage;
 
 namespace FeedFabric.Api.Storage;
@@ -39,6 +40,12 @@ public static class LocalBlobEndpoints
             if (!string.Equals(request.ContentType, contentType, StringComparison.OrdinalIgnoreCase))
             {
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+            // Uploads are bigger than the API's usual body limit (Kestrel:Limits:MaxRequestBodySize)
+            var sizeLimit = request.HttpContext.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (sizeLimit is { IsReadOnly: false })
+            {
+                sizeLimit.MaxRequestBodySize = storage.MaxUploadBytes + 1;
             }
             if (request.ContentLength > storage.MaxUploadBytes)
             {
