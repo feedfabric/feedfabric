@@ -29,7 +29,7 @@ public class HomeFeedService(
             return null;
         }
 
-        var feed = await ReadAsync(userId.Value, query, cancellationToken);
+        var feed = await ReadAsync(userId.Value, userId.Value, query, cancellationToken);
         // Logged with the same signals as For You, so both feeds are training data and can be compared. A repost is
         // logged as the post it shares, since that's what the viewer sees, likes and opens.
         var shown = feed.Posts.Select(p => p.RepostOf ?? p).ToList();
@@ -39,13 +39,20 @@ public class HomeFeedService(
         return feed;
     }
 
-    public async Task<HomeFeedResponse?> PeekAsync(string externalUserId, HomeFeedQuery query, CancellationToken cancellationToken)
+    public async Task<HomeFeedResponse?> PeekAsync(string externalUserId, string staffExternalUserId, HomeFeedQuery query,
+        CancellationToken cancellationToken)
     {
         var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
-        return userId is null ? null : await ReadAsync(userId.Value, query, cancellationToken);
+        if (userId is null)
+        {
+            return null;
+        }
+        var staffId = await db.Users.FindIdByExternalIdAsync(staffExternalUserId, cancellationToken);
+        return await ReadAsync(userId.Value, staffId, query, cancellationToken);
     }
 
-    private async Task<HomeFeedResponse> ReadAsync(Guid userId, HomeFeedQuery query, CancellationToken cancellationToken)
+    // signedIn is whose likes and reposts the posts show (AttachEngagementAsync)
+    private async Task<HomeFeedResponse> ReadAsync(Guid userId, Guid? signedIn, HomeFeedQuery query, CancellationToken cancellationToken)
     {
         // One extra post tells us whether there is another page
         var want = query.Limit + 1;
@@ -80,6 +87,7 @@ public class HomeFeedService(
 
         var page = posts.Take(query.Limit).ToList();
         await page.AttachRepostsAsync(db, cancellationToken);
+        await page.AttachEngagementAsync(db, signedIn, cancellationToken);
         await page.AttachMediaAsync(media, cancellationToken);
         return new HomeFeedResponse
         {

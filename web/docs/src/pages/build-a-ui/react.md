@@ -216,14 +216,15 @@ export function PostCard({ post, onRemove }: { post: FeedPost; onRemove: (id: st
   const ref = useRef<HTMLElement>(null)
   useImpression(ref, shown.id)
 
-  const [liked, setLiked] = useState(false)
+  // Starts from what the feed said; optimistic after that, since PUT and DELETE are idempotent
+  const [like, setLike] = useState({ on: shown.liked, count: shown.likes })
   const [error, setError] = useState<string | null>(null)
 
   async function toggleLike() {
-    const next = !liked
-    setLiked(next)                      // optimistic: PUT and DELETE are idempotent
-    try { await (next ? api.like(shown.id) : api.unlike(shown.id)) }
-    catch (e) { setLiked(!next); setError(describe(e)) }
+    const was = like
+    setLike({ on: !was.on, count: was.count + (was.on ? -1 : 1) })
+    try { await (was.on ? api.unlike(shown.id) : api.like(shown.id)) }
+    catch (e) { setLike(was); setError(describe(e)) }
   }
 
   async function notInterested() {
@@ -241,7 +242,7 @@ export function PostCard({ post, onRemove }: { post: FeedPost; onRemove: (id: st
         <img key={m.id} src={m.thumbnailUrl} width={m.width} height={m.height} alt="" loading="lazy" />
       ))}
       <footer>
-        <button aria-pressed={liked} onClick={toggleLike}>{liked ? 'Liked' : 'Like'}</button>
+        <button aria-pressed={like.on} onClick={toggleLike}>{like.on ? 'Liked' : 'Like'} · {like.count}</button>
         {post.ranking && <button onClick={notInterested}>Not interested</button>}
       </footer>
       {post.ranking && (

@@ -16,7 +16,10 @@ import type { HomeFeedPost, ProfileSummary, UserRef } from '../types'
 
 // Someone's feeds as they'd see them right now, for staff: Following newest first, and For You ranked, each post
 // with why it's there. Looking isn't logged as served and doesn't touch their own For You session, so it never
-// becomes training data or changes what they see.
+// becomes training data or changes what they see. Each post can be liked, reposted, commented on and so on as the
+// signed-in user, as a member would, so the whole member experience can be tried from here; on your own feed that
+// includes Show more, Not interested and your Favourites feed. In Development, switch who you are with the sidebar's
+// Development user.
 const PageSize = 20
 
 const props = defineProps<{ externalUserId?: string }>()
@@ -28,10 +31,13 @@ const profile = useRouteQuery('profile')
 const viewer = computed(() => props.externalUserId || me.value?.externalUserId || '')
 const viewerName = ref<string | null>(null)
 
-const tabs: TabItem<string>[] = [
+const isMe = computed(() => viewer.value === me.value?.externalUserId)
+// Favourites reads through the member endpoint, which only serves the signed-in user's own
+const tabs = computed<TabItem<string>[]>(() => [
   { value: 'following', label: 'Following', icon: 'users' },
   { value: 'foryou', label: 'For You', icon: 'sparkle' },
-]
+  ...(isMe.value ? [{ value: 'favourites', label: 'Favourites', icon: 'star' as const }] : []),
+])
 
 const profiles = ref<ProfileSummary[]>([])
 const profileOptions = computed<SelectOption<string>[]>(() => [
@@ -57,7 +63,9 @@ async function loadMore() {
   try {
     const page = tab.value === 'foryou'
       ? await api.forYou(viewer.value, cursor.value, profile.value || null, PageSize)
-      : await api.following(viewer.value, cursor.value, PageSize)
+      : tab.value === 'favourites' && isMe.value
+        ? await api.favouritesFeed(cursor.value, PageSize)
+        : await api.following(viewer.value, cursor.value, PageSize)
     // A newer reset (another tab, viewer or profile) has started since this was asked for
     if (mine !== generation) return
     posts.value = [...posts.value, ...page.posts]
@@ -89,8 +97,26 @@ function reset() {
   loadMore()
 }
 
-// The profile only matters to For You
-watch([viewer, () => tab.value, () => (tab.value === 'foryou' ? profile.value : '')], reset)
+// The profile only matters to For You. Signing in as someone else changes whose likes and reposts show.
+watch([viewer, () => tab.value, () => (tab.value === 'foryou' ? profile.value : ''), () => me.value?.externalUserId], reset)
+
+// Favourites is only yours: viewing someone else goes back to Following
+watch(isMe, mine => {
+  if (!mine && tab.value === 'favourites') tab.value = 'following'
+})
+
+// A card's changes go to every card showing that post: it can be there as itself and as what a repost shares
+function patch(postId: string, changes: Partial<HomeFeedPost>) {
+  posts.value = posts.value.map(p => {
+    if (p.repostOf?.id === postId) return { ...p, repostOf: { ...p.repostOf, ...changes } }
+    return p.id === postId && !p.repostOf ? { ...p, ...changes } : p
+  })
+}
+
+function remove(card: HomeFeedPost, scope: 'this' | 'everywhere') {
+  const postId = (card.repostOf ?? card).id
+  posts.value = posts.value.filter(p => (scope === 'this' ? p.id !== card.id : p.id !== postId && p.repostOf?.id !== postId))
+}
 
 // Loads the next page as the end of the list comes into view
 const sentinel = ref<HTMLElement | null>(null)
@@ -123,8 +149,8 @@ watch(() => me.value?.rankingAdmin, async rankingAdmin => {
   if (rankingAdmin && !profiles.value.length) profiles.value = await api.profiles().catch(() => [])
 }, { immediate: true })
 
-const pick = (user: UserRef) => router.push({ name: 'feed', params: { externalUserId: user.externalUserId }, query: { tab: tab.value === 'following' ? undefined : tab.value, profile: profile.value || undefined } })
-const isMe = computed(() => viewer.value === me.value?.externalUserId)
+const pick = (user: UserRef) => router.push({ name: 'feed', params: { externalUserId: user.externalUserId }, query: { tab: tab.value === 'foryou' ? tab.value : undefined, profile: profile.value || undefined } })
+const myName = computed(() => (me.value?.username ? `@${me.value.username}` : 'you'))
 </script>
 
 <template>
@@ -145,11 +171,19 @@ const isMe = computed(() => viewer.value === me.value?.externalUserId)
             </span>
           </div>
         </FabricStack>
-        <FabricButton icon="repeat" :loading="loading && !posts.length" @click="reset">
-          {{ tab === 'foryou' ? 'Rank again' : 'Refresh' }}
-        </FabricButton>
+        <FabricStack direction="row" align="center" :gap="2">
+          <FabricButton v-if="isMe" icon="edit" variant="ghost" to="/compose">New post</FabricButton>
+          <FabricButton icon="repeat" :loading="loading && !posts.length" @click="reset">
+            {{ tab === 'foryou' ? 'Rank again' : 'Refresh' }}
+          </FabricButton>
+        </FabricStack>
       </FabricStack>
     </FabricCard>
+
+    <FabricNotice v-if="viewer && !isMe" tone="info">
+      Likes, reposts, comments, follows and reports here are yours, as {{ myName }}, not {{ viewerName ? `@${viewerName}` : 'theirs' }}.
+      Show more and Not interested are on your own feed.
+    </FabricNotice>
 
     <FabricTabs v-model="tab" :tabs="tabs" label="Feed" />
 
@@ -161,7 +195,7 @@ const isMe = computed(() => viewer.value === me.value?.externalUserId)
         </template>
         <template v-else>
           <FabricBadge v-if="source" :tone="source === 'redis' ? 'good' : 'info'">from {{ source.replace('+', ' and ') }}</FabricBadge>
-          <span class="muted">newest first, from accounts they follow and their own posts</span>
+          <span class="muted">{{ tab === 'favourites' ? 'newest first, from your favourites; logged as served to you' : 'newest first, from accounts they follow and their own posts' }}</span>
         </template>
       </FabricStack>
       <FabricSelect v-if="tab === 'foryou' && me?.rankingAdmin" v-model="profile" :options="profileOptions" label="Ranking profile" hide-label size="sm" />
@@ -173,7 +207,7 @@ const isMe = computed(() => viewer.value === me.value?.externalUserId)
     </FabricNotice>
 
     <div class="posts">
-      <FeedPostCard v-for="p in posts" :key="p.id" :post="p" :now="now" />
+      <FeedPostCard v-for="p in posts" :key="p.id" :post="p" :now="now" :signals="isMe" @patch="patch" @remove="scope => remove(p, scope)" />
       <template v-if="loading && !posts.length">
         <FabricCard v-for="i in 3" :key="i">
           <FabricStack :gap="3">
@@ -184,7 +218,9 @@ const isMe = computed(() => viewer.value === me.value?.externalUserId)
       </template>
     </div>
 
-    <FabricEmptyState v-if="done && !posts.length && !error" :icon="tab === 'foryou' ? 'sparkle' : 'users'"
+    <FabricEmptyState v-if="done && !posts.length && !error && tab === 'favourites'" icon="star" title="Nothing from your favourites"
+      description="Add up to 30 favourites from a post's menu, so you never miss what they post." />
+    <FabricEmptyState v-else-if="done && !posts.length && !error" :icon="tab === 'foryou' ? 'sparkle' : 'users'"
       :title="tab === 'foryou' ? 'Nothing to rank for them yet' : 'Nothing from the accounts they follow'"
       :description="tab === 'foryou' ? 'For You needs recent posts on their topics, or from people like them.' : 'They may not follow anyone yet, or nobody they follow has posted.'" />
 

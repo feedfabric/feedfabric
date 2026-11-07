@@ -8,8 +8,9 @@ namespace FeedFabric.Application.Services.Tags;
 
 public class TagService(AppDbContext db, IMediaService media, TimeProvider timeProvider) : ITagService
 {
-    public async Task<HomeFeedResponse> PostsAsync(string tag, HomeFeedQuery query, CancellationToken cancellationToken)
+    public async Task<HomeFeedResponse> PostsAsync(string tag, string externalUserId, HomeFeedQuery query, CancellationToken cancellationToken)
     {
+        var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
         var normalized = tag.TrimStart('#').ToLowerInvariant();
         var posts = db.Posts.Where(p => p.DeletedAt == null && p.Status == ContentStatus.Visible && db.Users.Any(u => u.Id == p.AuthorId && u.Status == UserStatus.Active)
             && db.PostTags.Any(t => t.PostId == p.Id && t.Tag == normalized));
@@ -21,6 +22,7 @@ public class TagService(AppDbContext db, IMediaService media, TimeProvider timeP
         // One extra row tells us whether there is another page
         var page = await posts.OrderByDescending(p => p.Id).ToFeedPosts(db).Take(query.Limit + 1).ToListAsync(cancellationToken);
         var results = page.Take(query.Limit).ToList();
+        await results.AttachEngagementAsync(db, userId, cancellationToken);
         await results.AttachMediaAsync(media, cancellationToken);
         return new HomeFeedResponse
         {

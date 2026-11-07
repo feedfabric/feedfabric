@@ -90,7 +90,7 @@ public class RankingProfilesController(RankingProfileStore store, ForYouService 
             return InvalidProblem(errors);
         }
         var externalUserId = string.IsNullOrWhiteSpace(viewer) ? currentUser.ExternalUserId : viewer;
-        var feed = await forYou.PreviewAsync(externalUserId, draft, Math.Clamp(limit, 1, MaxPreview), cancellationToken);
+        var feed = await forYou.PreviewAsync(externalUserId, currentUser.ExternalUserId, draft, Math.Clamp(limit, 1, MaxPreview), cancellationToken);
         return feed is null
             ? this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.UserNotFound, $"User {externalUserId} not found.", new { externalUserId })
             : feed;

@@ -241,6 +241,42 @@ export interface HomeFeedPost {
   repostOf?: HomeFeedPost | null
   // Held for review: only its author is shown it
   isHeld?: boolean
+  // On a repost these are on repostOf, the post that's liked. liked and reposted are the signed-in user's: yours,
+  // whoever's feed this is.
+  likes: number
+  comments: number
+  reposts: number
+  liked: boolean
+  reposted: boolean
+}
+
+// A comment or reply as members see it; content is null once it's deleted
+export interface FeedComment {
+  id: string
+  postId: string
+  parentCommentId: string | null
+  authorExternalUserId: string
+  authorUsername: string
+  content: string | null
+  isDeleted: boolean
+  isHeld: boolean
+  createdAt: string
+  replyCount: number
+}
+
+export interface CommentPage {
+  comments: FeedComment[]
+  nextCursor: string | null
+}
+
+export type ReportReason = 'spam' | 'harassment' | 'hate' | 'threat' | 'sexual' | 'self_harm' | 'other'
+
+export interface Favourite {
+  externalUserId: string
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+  addedAt: string
 }
 
 export interface TrendingTag {

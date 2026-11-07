@@ -41,7 +41,8 @@ error codes it returns.
 | <span class="m">GET</span> | `/userfeed` | Your own posts, in the bare post shape | `limit`, `cursor`, `order` (`newest`/`oldest`), `gt`, `gte`, `lt`, `lte` (post IDs) | |
 
 Feed responses are `{ posts, nextCursor, source }` (Following, favourites, tags) or
-`{ posts, nextCursor, ranker, profile, candidates }` (For You). See [Feeds and paging](/build-a-ui/feeds/) and the
+`{ posts, nextCursor, ranker, profile, candidates }` (For You). Each post has `likes`, `comments` and `reposts`, and
+`liked` and `reposted` for the signed-in member (on a repost, on its `repostOf`). See [Feeds and paging](/build-a-ui/feeds/) and the
 [types](/build-a-ui/api-client/#types).
 
 ## Posts
@@ -168,6 +169,9 @@ New and edited posts use a saved set within a minute; posts already tagged keep 
 | <span class="m">GET</span> | `/admin/system` | Sign-in settings (no secrets), moderation thresholds, media limits, models, ranker, users by status, outbox and consumers |
 | <span class="m">GET</span> | `/admin/feed/{externalUserId}/following` | A member's Following as they'd see it, without logging it |
 | <span class="m">GET</span> | `/admin/feed/{externalUserId}/foryou?profile=` | A member's For You in a session of its own, without logging it |
+
+On the two `/admin/feed` routes and `/ranking/preview`, `liked` and `reposted` are yours, not the member's: they're for
+acting on the posts as yourself.
 
 ## Other
 

@@ -48,4 +48,18 @@ public class HomeFeedPostResponse
 
     // Only in the For You feed: why the post is where it is
     public PostRanking? Ranking {get;set;}
+
+    // Likes, comments (visible ones, and the signed-in user's own held ones) and reposts. On a repost they're on its
+    // RepostOf, the post that's liked, and stay 0 on the repost itself.
+    public int Likes {get;set;}
+
+    public int Comments {get;set;}
+
+    public int Reposts {get;set;}
+
+    // Whether the signed-in user has liked or reposted it: the member on their own feeds, the staff member on /admin
+    // and /ranking, since they're the one whose like a button would add
+    public bool Liked {get;set;}
+
+    public bool Reposted {get;set;}
 }

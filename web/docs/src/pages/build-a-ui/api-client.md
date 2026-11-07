@@ -39,6 +39,12 @@ export interface FeedPost {
   repostOfId: string | null
   repostOf: FeedPost | null    // on a repost: the post it shares
   isHeld: boolean              // held for review: only its author is ever shown it
+  // On a repost these are on repostOf, the post that's liked, and 0/false on the repost itself
+  likes: number
+  comments: number             // visible ones, and the member's own held ones
+  reposts: number
+  liked: boolean               // by the signed-in member
+  reposted: boolean
   tags: Tag[]
   media: PostMedia[]
   ranking: PostRanking | null  // For You only

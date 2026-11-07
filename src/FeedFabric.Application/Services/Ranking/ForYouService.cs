@@ -45,7 +45,7 @@ public class ForYouService(
 
         var offset = Offset(query);
         var session = await SessionAsync(viewerId.Value, offset, profile, SessionKey(viewerId.Value, profile), cancellationToken);
-        var response = await PageAsync(session, offset, query.Limit, profile, cancellationToken);
+        var response = await PageAsync(session, offset, query.Limit, profile, viewerId, cancellationToken);
         await feedLog.LogServedAsync(viewerId.Value, FeedNames.ForYou, session.Ranker,
             session.Posts.Skip(offset).Take(query.Limit).Select((p, i) => new ServedPost(p.PostId, offset + i, p.Score, p.Features, p.Explored, p.Propensity)).ToList(),
             cancellationToken, profile.Label);
@@ -53,8 +53,9 @@ public class ForYouService(
     }
 
     // What a profile would show this viewer right now, without logging it or touching their session: for trying out
-    // a profile before saving it
-    public async Task<ForYouResponse?> PreviewAsync(string externalUserId, ResolvedProfile profile, int limit, CancellationToken cancellationToken)
+    // a profile before saving it. Liked and Reposted are the staff member's.
+    public async Task<ForYouResponse?> PreviewAsync(string externalUserId, string staffExternalUserId, ResolvedProfile profile, int limit,
+        CancellationToken cancellationToken)
     {
         var viewerId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
         if (viewerId is null)
@@ -62,7 +63,8 @@ public class ForYouService(
             return null;
         }
         var session = await RankAsync(viewerId.Value, profile, cancellationToken);
-        return await PageAsync(session, 0, limit, profile, cancellationToken);
+        var staffId = await db.Users.FindIdByExternalIdAsync(staffExternalUserId, cancellationToken);
+        return await PageAsync(session, 0, limit, profile, staffId, cancellationToken);
     }
 
     // What this viewer's For You shows, paged like theirs but in a session of its own and without logging it, so
@@ -78,7 +80,8 @@ public class ForYouService(
         }
         var offset = Offset(query);
         var session = await SessionAsync(viewerId.Value, offset, profile, PeekKey(viewerId.Value, staffExternalUserId, profile), cancellationToken);
-        return await PageAsync(session, offset, query.Limit, profile, cancellationToken);
+        var staffId = await db.Users.FindIdByExternalIdAsync(staffExternalUserId, cancellationToken);
+        return await PageAsync(session, offset, query.Limit, profile, staffId, cancellationToken);
     }
 
     private static int Offset(ForYouQuery query) => int.TryParse(query.Cursor, out var o) && o > 0 ? o : 0;
@@ -96,7 +99,9 @@ public class ForYouService(
         return session;
     }
 
-    private async Task<ForYouResponse> PageAsync(Session session, int offset, int limit, ResolvedProfile profile, CancellationToken cancellationToken)
+    // signedIn is whose likes and reposts the posts show (AttachEngagementAsync)
+    private async Task<ForYouResponse> PageAsync(Session session, int offset, int limit, ResolvedProfile profile, Guid? signedIn,
+        CancellationToken cancellationToken)
     {
         var page = session.Posts.Skip(offset).Take(limit).ToList();
         var ids = page.Select(p => p.PostId).ToList();
@@ -118,6 +123,7 @@ public class ForYouService(
             };
             return post;
         }).ToList();
+        await results.AttachEngagementAsync(db, signedIn, cancellationToken);
         await results.AttachMediaAsync(media, cancellationToken);
 
         var next = offset + limit;

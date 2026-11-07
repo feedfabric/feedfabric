@@ -2,7 +2,8 @@ import { session } from './session'
 import type {
   AdminPost, AdminPostDetail, AdminReport, AdminUser, AdminUserDetail, ContentState, Dashboard, Decision, ForYouFeed, LogEntry, Me,
   ModerationAction, ModerationOverview, Page, ProfileDetail, ProfileError, ProfileSummary, ProfileVersion, RankingProfile, RankingVocabulary,
-  ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost, HomeFeed,
+  ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost, HomeFeed, CommentPage, FeedComment, Favourite,
+  ReportReason,
 } from './types'
 
 export class ApiError extends Error {
@@ -42,6 +43,12 @@ function describe(status: number, code: string | undefined, what: string): strin
   if (code === 'post.not_found' || code === 'comment.not_found') return 'It was deleted before you got to it.'
   if (code === 'user.not_found') return 'No such user.'
   if (code === 'media.not_ready') return 'A photo is still being checked, or was rejected. Remove it or wait.'
+  if (code === 'user.not_synced') return "This account hasn't been set up as a member yet. Open Feeds once to sign in, then try again."
+  if (code === 'user.suspended') return "This account is suspended, so it can read but not post, comment, like, repost or follow."
+  if (code === 'content.violation') return 'That breaks the community rules, so it was blocked.'
+  if (code === 'post.edit_window_closed') return 'Posts can only be edited for 60 minutes after posting.'
+  if (code === 'follow.self' || code === 'favourite.self') return "That's you."
+  if (code === 'favourite.limit_reached') return 'Already at 30 favourites. Remove one to add another.'
   return `${what} failed: ${status}${code ? ` ${code}` : ''}`
 }
 
@@ -108,6 +115,8 @@ export const api = {
     request<HomeFeed>(`/admin/feed/${id(externalUserId)}/following${query({ cursor, limit })}`),
   forYou: (externalUserId: string, cursor?: string | null, profile?: string | null, limit = 20) =>
     request<ForYouFeed>(`/admin/feed/${id(externalUserId)}/foryou${query({ cursor, profile, limit })}`),
+  // The signed-in user's own favourites feed, through the member endpoint, so logged as served to them
+  favouritesFeed: (cursor?: string | null, limit = 20) => request<HomeFeed>(`/userfeed/favourites${query({ cursor, limit })}`),
 
   // Ranking profiles (ranking admins)
   profiles: () => request<ProfileSummary[]>('/ranking/profiles'),
@@ -127,6 +136,29 @@ export const api = {
   media: (mediaId: string) => request<MediaStatus>(`/media/${id(mediaId)}`),
   adminMedia: (mediaId: string) => request<AdminMedia>(`/admin/media/${id(mediaId)}`),
   createPost: (content: string, mediaIds: string[]) => request<CreatedPost>('/userfeed/posts', 'POST', { content, mediaIds }),
+  editPost: (postId: string, content: string) => request<CreatedPost>(`/userfeed/posts/${id(postId)}`, 'PUT', { content }),
+  deletePost: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}`, 'DELETE'),
+
+  // Acting as a member, as the signed-in user, through the endpoints members' apps use
+  like: (postId: string, on: boolean) => request<void>(`/userfeed/posts/${id(postId)}/like`, on ? 'PUT' : 'DELETE'),
+  repost: (postId: string, on: boolean) => request<void>(`/userfeed/posts/${id(postId)}/repost`, on ? 'PUT' : 'DELETE'),
+  comments: (postId: string, cursor?: string | null, limit = 20) =>
+    request<CommentPage>(`/userfeed/posts/${id(postId)}/comments${query({ cursor, limit })}`),
+  replies: (commentId: string, cursor?: string | null, limit = 20) =>
+    request<CommentPage>(`/userfeed/comments/${id(commentId)}/replies${query({ cursor, limit })}`),
+  comment: (postId: string, content: string, parentCommentId?: string | null) =>
+    request<FeedComment>(`/userfeed/posts/${id(postId)}/comments`, 'POST', { content, parentCommentId: parentCommentId ?? undefined }),
+  deleteComment: (commentId: string) => request<void>(`/userfeed/comments/${id(commentId)}`, 'DELETE'),
+  report: (item: { postId: string } | { commentId: string }, reason: ReportReason) =>
+    'commentId' in item
+      ? request<void>(`/userfeed/comments/${id(item.commentId)}/report`, 'POST', { reason })
+      : request<void>(`/userfeed/posts/${id(item.postId)}/report`, 'POST', { reason }),
+  follow: (externalUserId: string, on: boolean) => request<void>(`/follows/${id(externalUserId)}`, on ? 'PUT' : 'DELETE'),
+  favourites: () => request<Favourite[]>('/favourites'),
+  favourite: (externalUserId: string, on: boolean) => request<void>(`/favourites/${id(externalUserId)}`, on ? 'PUT' : 'DELETE'),
+  notInterested: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/not-interested`, 'POST'),
+  showMore: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/show-more`, 'POST'),
+  opened: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/open`, 'POST'),
 }
 
 // PUTs a file to an upload URL, reporting progress (fetch can't report upload progress yet)

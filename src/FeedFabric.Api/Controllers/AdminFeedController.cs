@@ -23,7 +23,7 @@ public class AdminFeedController(IHomeFeedService homeFeed, ForYouService forYou
     [HttpGet("following")]
     public async Task<ActionResult<HomeFeedResponse>> Following(string externalUserId, [FromQuery] HomeFeedQuery query,
         CancellationToken cancellationToken) =>
-        await homeFeed.PeekAsync(externalUserId, query, cancellationToken) is { } feed ? feed : NotFoundUser(externalUserId);
+        await homeFeed.PeekAsync(externalUserId, currentUser.ExternalUserId, query, cancellationToken) is { } feed ? feed : NotFoundUser(externalUserId);
 
     // GET /admin/feed/{externalUserId}/foryou?limit=20&profile=<key>, then add &cursor=<nextCursor>: ranked for them,
     // each post with why it's there. The first page ranks again.
