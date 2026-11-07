@@ -149,7 +149,7 @@ For a request that came by email or support rather than `DELETE /me`:
 ## The staff audit log
 
 Every change through `/admin` or `/ranking` (suspending, verifying or deleting a user, a moderation decision, saving
-or deleting a ranking profile, setting the default) is logged in the `FeedFabric.Audit` category:
+or deleting a ranking profile, setting the default, saving topics) is logged in the `FeedFabric.Audit` category:
 
 ```
 Staff action POST /admin/moderation/posts/…/decision by <externalUserId> (roles moderator) from 203.0.113.7: 200
@@ -158,4 +158,4 @@ Staff action POST /admin/moderation/posts/…/decision by <externalUserId> (role
 with the method, path, actor, roles, address and status as structured fields. Route that category to log storage staff
 can't edit or delete, and keep it as long as the moderation events it explains (`Retention:ModerationEvents`, a year).
 To see who did what, search it by actor or by the ID in the path. The moderation log (`GET /admin/moderation/log`)
-and ranking profile versions also record who decided what.
+and ranking profile and topic versions also record who decided what.

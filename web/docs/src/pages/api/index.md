@@ -127,6 +127,20 @@ hands them out. See [Photos](/how-it-works/media/) and [Composing with photos](/
 
 See [Ranking profiles](/how-it-works/profiles/).
 
+## Topics <small>(ranking admin)</small>
+
+| | Route | Purpose | Errors |
+|---|---|---|---|
+| <span class="m">GET</span> | `/admin/topics` | The set in use: `{ source, version, library, savedAt, savedBy, topics }`; `source` is `saved`, `configuration`, `default` or `off` | |
+| <span class="m">GET</span> | `/admin/topics/library` | Ready-made sets to start from: `[{ key, name, description, keywords }]` | |
+| <span class="m">GET</span> | `/admin/topics/versions` | Every saved set, newest first: `[{ version, savedAt, savedBy, library, topics }]`, `topics` being how many | |
+| <span class="m">GET</span> | `/admin/topics/versions/{n}` | One saved set: topic name to keywords | `404 topics.version_not_found` |
+| <span class="m put">PUT</span> | `/admin/topics` | Save `{ topics, library? }` as a new version and use it; empty `topics` means hashtags only | `400 topics.invalid`, `400 topics.unknown_library` |
+| <span class="m post">POST</span> | `/admin/topics/preview` | The topics `{ text, topics? }` would get, from the draft `topics` or the set in use: `[{ topic, confidence }]` | `400 topics.invalid` |
+
+New and edited posts use a saved set within a minute; posts already tagged keep their tags. See
+[Tags and mentions](/how-it-works/posting/#tags-and-mentions).
+
 ## Moderation <small>(moderator)</small>
 
 | | Route | Purpose | Errors |

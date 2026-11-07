@@ -99,7 +99,7 @@ OpenID Connect server.
 | `Auth:Claims:Avatar` | `picture` | |
 | `Auth:Claims:Roles` | `roles`, `role`, `permissions` | |
 | `Auth:Roles:Moderator` | `moderator` | Your role names that count as moderators |
-| `Auth:Roles:RankingAdmin` | `ranking-admin` | Your role names that can save ranking profiles |
+| `Auth:Roles:RankingAdmin` | `ranking-admin` | Your role names that can save ranking profiles and topics |
 | `Auth:ProvisionUsers` | `true` | Create users on their first request |
 | `Auth:ProfileRefresh` | `01:00:00` | How long a profile from a token is trusted before it's refreshed |
 
@@ -160,17 +160,31 @@ them.
 ## Topics
 
 Posts are tagged with topics inferred from their wording, as well as their hashtags. For You uses topics to match
-posts to what a member reads, to draw "popular in your topics" candidates, and to avoid long runs of one topic.
+posts to what a member reads, to draw "popular in your topics" candidates, and to avoid long runs of one topic. The
+docs site's [Tags and mentions](https://docs.feedfabric.dev/how-it-works/posting/#tags-and-mentions) shows how tags
+reach a post.
+
+The topics in use come from the first of these that's set:
+
+1. **Topics saved by staff** through `PUT /admin/topics` (ranking admins; see the
+   [API reference](https://docs.feedfabric.dev/api/#topics-ranking-admin)). Each save is a new version, and the
+   newest is used.
+2. **`Topics:Keywords`**, below.
+3. **The built-in wellness topics.**
+
+So once staff have saved topics, `Topics:Keywords` no longer applies. `Topics:Enabled` set to `false` turns topics off
+whatever was saved.
 
 | Setting | Default | Notes |
 |---|---|---|
-| `Topics:Enabled` | `true` | Off tags posts with their hashtags only |
-| `Topics:Keywords` | empty, so the built-in wellness topics | Topic name to the words and phrases that suggest it. Setting any replaces all the built-in ones. |
+| `Topics:Enabled` | `true` | Off tags posts with their hashtags only, even if staff have saved topics |
+| `Topics:Keywords` | empty, so the built-in wellness topics | Topic name to the words and phrases that suggest it. Setting any replaces all the built-in ones. Unused once staff save topics. |
 
 A topic name is a tag, so it follows the hashtag rules: a letter, then 1 to 49 letters, digits or `_`, lowercased. A
 hashtag and a topic with the same name are one tag. Keywords match whole words, ignoring case; one match gives a
 confidence of 0.5 and each further keyword adds 0.25, up to 1. A name that can't be a tag, or a topic with no
-keywords, stops startup. The built-in topics are in `src/FeedFabric.Application/Services/Tags/TopicLibrary.cs`.
+keywords, stops startup; through the API it's a `400 topics.invalid`. Up to 50 topics, each with up to 100 keywords of
+up to 60 characters. The built-in topics are in `src/FeedFabric.Application/Services/Tags/TopicLibrary.cs`.
 
 For a climbing community, in `appsettings.json` or a mounted `appsettings.Production.json`:
 
@@ -187,7 +201,24 @@ For a climbing community, in `appsettings.json` or a mounted `appsettings.Produc
 As environment variables, each keyword is one more level: `Topics__Keywords__bouldering__0=boulder`,
 `Topics__Keywords__bouldering__1=crimp`, and so on.
 
-Changing topics tags new and edited posts. Posts already tagged keep their tags.
+Changing topics tags new and edited posts. Posts already tagged keep their tags. A save through the API reaches the
+instance that took it straight away, and every other instance within a minute.
+
+### Choosing topics through the API
+
+`GET /admin/topics/library` lists ready-made sets to start from: `wellness` (the built-in one), `climbing`,
+`running`, `cycling` and `gardening`. Save one, edited or not, with the whole set and the library key it came from:
+
+```http
+PUT /admin/topics
+{ "library": "climbing", "topics": { "bouldering": ["boulder", "crimp", "send"], "trad": ["trad", "cams"] } }
+```
+
+`GET /admin/topics` returns the set in use with its `source`: `saved`, `configuration`, `default` or `off`.
+`GET /admin/topics/versions` lists every saved version, and `GET /admin/topics/versions/{n}` returns one; to go back to
+an earlier set, save it again. `POST /admin/topics/preview` with `{ "text": "…" }` returns the topics that text would
+get, from the set in use or from a draft passed as `topics`. Saving an empty `topics` tags posts with their hashtags
+only. The admin panel doesn't have a Topics page yet.
 
 ## Malware scanning
 
@@ -265,7 +296,7 @@ is a `429` `rate_limited` with `Retry-After`.
 | `RateLimits:Reports` | 10 a minute | |
 | `RateLimits:Uploads` | 20 a minute | Starting and completing uploads |
 | `RateLimits:Signals` | 600 a minute | Impressions, opens, dwell, "not interested" and "show more" |
-| `RateLimits:RankingPreview` | 30 a minute | `POST /ranking/preview` |
+| `RateLimits:RankingPreview` | 30 a minute | `POST /ranking/preview` and `POST /admin/topics/preview` |
 | `RateLimits:Account` | 5 an hour | `GET /me/export` and `DELETE /me` |
 
 Each rule has `PermitLimit` and `Window`, e.g. `RateLimits__Posting__PermitLimit=20`,
