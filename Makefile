@@ -2,7 +2,7 @@
 include .env
 export ConnectionStrings__Default = Host=localhost;Port=$(POSTGRES_PORT);Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD)
 
-EF = dotnet ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Api
+EF = dotnet tool restore > /dev/null && dotnet tool run dotnet-ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Application
 
 .PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop backfill migrate migration admin admin-build openapi docs fabric train tune-toxicity models
 

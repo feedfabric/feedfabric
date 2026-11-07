@@ -1,5 +1,5 @@
-# Builds and tests everything on each pull request. On main and version tags it also publishes the API and worker
-# images to GitHub Container Registry: ghcr.io/<owner>/<repo>/api and .../worker-events.
+# Builds and tests everything on each pull request. On main and version tags it also publishes the API, worker and
+# migrations images to GitHub Container Registry: ghcr.io/<owner>/<repo>/api, .../worker-events and .../migrations.
 name: CI
 
 on:
@@ -55,6 +55,13 @@ jobs:
 
       - run: dotnet build --configuration Release
 
+      # Fails when an entity changed without a migration, which would leave the bundle out of step with the model
+      - name: Check migrations match the model
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/FeedFabric.Application --startup-project src/FeedFabric.Application
+
+      # Includes FeedFabric.Api.Tests and FeedFabric.Worker.Tests, which start Postgres, Redis and Kafka with Testcontainers
       - run: dotnet test --configuration Release --no-build
 
   admin:
@@ -113,6 +120,9 @@ jobs:
             dockerfile: src/FeedFabric.Api/Dockerfile
           - image: worker-events
             dockerfile: src/FeedFabric.Worker.Events/Dockerfile
+          # The EF migration bundle, run as a one-off container before the API rolls out (docs/deploying.md)
+          - image: migrations
+            dockerfile: src/FeedFabric.Application/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
