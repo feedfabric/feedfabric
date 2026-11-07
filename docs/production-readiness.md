@@ -11,10 +11,10 @@ can be observed and operated, and meet UK GDPR obligations for health-adjacent u
 
 | Item | What's left | Owner |
 |---|---|---|
-| 2 | Branch protection on `main`, requiring the CI checks. Repository settings, not code. | Kieran |
-| 12 | A DPIA and a privacy notice ([data-retention.md](data-retention.md#still-to-do-by-people)) | Kieran |
+| 2 | Branch protection on `main`, requiring the CI checks. Repository settings, not code. | krnblds |
+| 12 | A DPIA and a privacy notice ([data-retention.md](data-retention.md#still-to-do-by-people)) | krnblds |
 | 16 | Move `EmbeddingIndex` out of each API instance (needs a pgvector migration, so not done with this plan) | |
-| 16 | Set the load target, then run `tools/load/feeds.js` against it | Kieran |
+| 16 | Set the load target, then run `tools/load/feeds.js` against it | krnblds |
 | 18 | The staff audit log is structured logs; move it to a table if staff need to search it in the admin panel (needs a migration) | |
 
 ## P0: blockers
@@ -151,6 +151,6 @@ because the images have no curl. The checks are in [deploying.md](deploying.md#h
 rebuilding Redis timelines, Redis down, swapping a model, the moderation backlog, erasing an account and the audit
 log. [deploying.md](deploying.md) is the deployment guide.
 
-## Decisions (owner: Kieran)
+## Decisions (owner: krnblds)
 - **Deployment target:** Docker, from the images CI publishes to GHCR.
 - **Load target** for item 16: to be set (requests per second and p95).
