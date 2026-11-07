@@ -59,6 +59,9 @@ your platform's secret store, passed in as environment variables.
 
 ## Deploying
 
+[Deploying FeedFabric](/deploy/) walks through a complete setup, and [Cloudflare](/deploy/cloudflare/) the parts
+that can run there. In brief:
+
 - **Images:** `src/FeedFabric.Api/Dockerfile` and `src/FeedFabric.Worker.Events/Dockerfile`, built from the repository
   root. The API listens on 8080 in its container. The decided target is Docker, from images CI publishes to GHCR.
 - **Migrations:** only Development migrates on startup. Elsewhere run them as a deploy step before the API rolls out

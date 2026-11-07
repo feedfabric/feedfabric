@@ -4,16 +4,23 @@
 import '../../../fabric-ui/src/styles/fabric.css'
 import '../styles/docs.css'
 import { nav, pages, normalise } from '../nav'
+import { repo, sourcePath, editUrl } from '../site'
 
 interface Heading { depth: number; slug: string; text: string }
 interface Props {
   frontmatter?: { title: string; description?: string }
+  // Markdown pages get their own file's path from Astro; .astro pages pass source, from the repository root
+  file?: string
+  source?: string
   title?: string
   description?: string
   headings?: Heading[]
+  // false keeps a page out of search (the 404 page)
+  index?: boolean
 }
 
-const { frontmatter, headings = [] } = Astro.props
+const { frontmatter, headings = [], index: searchable = true } = Astro.props
+const source = Astro.props.source ?? sourcePath(Astro.props.file)
 const title = frontmatter?.title ?? Astro.props.title ?? 'FeedFabric'
 const description = frontmatter?.description ?? Astro.props.description ?? ''
 const path = normalise(Astro.url.pathname)
@@ -22,6 +29,7 @@ const prev = index > 0 ? pages[index - 1] : undefined
 const next = index >= 0 && index < pages.length - 1 ? pages[index + 1] : undefined
 const toc = headings.filter(h => h.depth === 2 || h.depth === 3)
 const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric docs`
+const canonical = Astro.site ? new URL(path, Astro.site).href : undefined
 ---
 
 <!doctype html>
@@ -31,6 +39,13 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{pageTitle}</title>
     {description && <meta name="description" content={description} />}
+    {canonical && <link rel="canonical" href={canonical} />}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FeedFabric docs" />
+    <meta property="og:title" content={pageTitle} />
+    {description && <meta property="og:description" content={description} />}
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta name="theme-color" content="#4b47c9" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Before anything paints: a theme chosen on this site wins over the system's -->
     <script is:inline>
@@ -49,6 +64,15 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
       <a class="brand" href="/">
         <img src="/favicon.svg" width="28" height="28" alt="" />
         <span>FeedFabric <span class="brand-sub">docs</span></span>
+      </a>
+      <button class="search-open" type="button" aria-haspopup="dialog" aria-keyshortcuts="/ Control+K Meta+K">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <span class="search-label">Search</span>
+        <kbd>/</kbd>
+      </button>
+      <a class="github" href={repo.url} aria-label="FeedFabric on GitHub">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="fill" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" /></svg>
+        <span class="github-label">GitHub</span>
       </a>
       <button class="theme-toggle" type="button" aria-label="Theme: follows your system. Change it">
         <svg class="icon-system" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
@@ -76,11 +100,15 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
       <div class="scrim" hidden></div>
 
       <main id="content" class="content" tabindex="-1">
-        <article class="prose">
+        <article class="prose" data-pagefind-body={searchable ? '' : undefined}>
           <h1>{title}</h1>
           {description && <p class="lede">{description}</p>}
           <slot />
         </article>
+
+        {source && (
+          <p class="edit"><a href={editUrl(source)}>Edit this page on GitHub</a></p>
+        )}
 
         {(prev || next) && (
           <nav class="pager" aria-label="Previous and next pages">
@@ -89,8 +117,10 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
           </nav>
         )}
         <footer class="foot">
-          FeedFabric is MIT licensed. These pages are built from <code>web/docs</code>; the repository's own
-          <code>docs/</code> folder has the full configuration, data model and error lists.
+          FeedFabric is MIT licensed and <a href={repo.url}>open source on GitHub</a>. These pages are built from
+          <code>web/docs</code>; the repository's own <code>docs/</code> folder has the full configuration, data model
+          and error lists. Found something wrong? <a href="/contributing/">Fix it</a> or
+          <a href={`${repo.url}/issues/new`}>open an issue</a>.
         </footer>
       </main>
 
@@ -105,6 +135,17 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
         </aside>
       )}
     </div>
+
+    <dialog class="search" aria-label="Search the docs">
+      <div class="search-head">
+        <p class="nav-title">Search the docs</p>
+        <button class="search-close" type="button" aria-label="Close search">Esc</button>
+      </div>
+      <div id="search"></div>
+      <p class="search-missing" hidden>
+        Search is built with the site: run <code>npm run build</code> and <code>npm run preview</code> to try it.
+      </p>
+    </dialog>
 
     <script>
       // Theme: system → light → dark → system, remembered in this browser only
@@ -147,6 +188,48 @@ const pageTitle = path === '/' ? 'FeedFabric docs' : `${title} · FeedFabric doc
       navButton.addEventListener('click', () => setOpen(!document.body.classList.contains('nav-open')))
       scrim.addEventListener('click', () => setOpen(false))
       document.addEventListener('keydown', e => e.key === 'Escape' && document.body.classList.contains('nav-open') && (setOpen(false), navButton.focus()))
+
+      // Search: Pagefind indexes the built site (npm run build), so it's loaded the first time the dialog opens and
+      // is missing under npm run dev
+      const dialog = document.querySelector<HTMLDialogElement>('dialog.search')!
+      let loaded: Promise<void> | undefined
+      function loadSearch() {
+        loaded ??= new Promise<void>((resolve, reject) => {
+          const css = document.createElement('link')
+          css.rel = 'stylesheet'
+          css.href = '/pagefind/pagefind-ui.css'
+          document.head.append(css)
+          const script = document.createElement('script')
+          script.src = '/pagefind/pagefind-ui.js'
+          script.onload = () => {
+            // @ts-expect-error PagefindUI is a global from the script above
+            new PagefindUI({ element: '#search', showSubResults: true, showImages: false, resetStyles: false, autofocus: true })
+            resolve()
+          }
+          script.onerror = () => reject(new Error('No search index'))
+          document.head.append(script)
+        }).catch(() => {
+          dialog.querySelector<HTMLElement>('.search-missing')!.hidden = false
+        })
+        return loaded
+      }
+      async function openSearch() {
+        if (dialog.open) return
+        dialog.showModal()
+        await loadSearch()
+        dialog.querySelector<HTMLInputElement>('.pagefind-ui__search-input')?.focus()
+      }
+      document.querySelector('.search-open')!.addEventListener('click', openSearch)
+      dialog.querySelector('.search-close')!.addEventListener('click', () => dialog.close())
+      // A click on the backdrop (outside the dialog's box) closes it
+      dialog.addEventListener('click', e => e.target === dialog && dialog.close())
+      document.addEventListener('keydown', e => {
+        const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))
+        if ((e.key === '/' && !typing) || (e.key === 'k' && (e.metaKey || e.ctrlKey))) {
+          e.preventDefault()
+          openSearch()
+        }
+      })
     </script>
   </body>
 </html>

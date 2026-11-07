@@ -12,7 +12,7 @@ const headings = [
 ]
 ---
 
-<Doc title="FeedFabric" description="An open-source feed engine with ranking you can tune: timelines with fan-out, a learned For You ranker, ranking profiles, and content safety that runs on your own servers." headings={headings}>
+<Doc source="web/docs/src/pages/index.astro" title="FeedFabric" description="An open-source feed engine with ranking you can tune: timelines with fan-out, a learned For You ranker, ranking profiles, and content safety that runs on your own servers." headings={headings}>
   <h2 id="what-it-is">What it is</h2>
   <p>
     FeedFabric is the back end of a social feed, written in C# on .NET 10. Members post, comment, like, repost and
@@ -85,7 +85,9 @@ const headings = [
   <div class="cards">
     <a href="/running-locally/"><strong>Run it locally</strong><span>Docker, make targets, ports, the simulator and training a model.</span></a>
     <a href="/how-it-works/for-you/"><strong>How For You ranks</strong><span>Candidates, scoring, variety, sessions and cursors.</span></a>
-    <a href="/build-a-ui/"><strong>Build a UI</strong><span>A Vue + FabricUI member app, step by step.</span></a>
+    <a href="/formulas/"><strong>Formulas</strong><span>Every number behind a post's place, and how to write your own.</span></a>
+    <a href="/build-a-ui/"><strong>Build a UI</strong><span>A member app step by step, in Vue, React or plain JavaScript.</span></a>
+    <a href="/deploy/"><strong>Deploy it</strong><span>Images, infrastructure, secrets, migrations, models and Cloudflare.</span></a>
     <a href="/api/"><strong>API reference</strong><span>Every endpoint, its parameters and the errors it returns.</span></a>
   </div>
 </Doc>

@@ -1,0 +1,19 @@
+// The docs site on Cloudflare Workers, as static assets only: no Worker code runs. `npm run deploy` builds dist/ and
+// uploads it; CI does the same on main (.github/workflows/docs.yml). See /deploy/cloudflare/ in the site itself.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "feedfabric-docs",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist",
+    // Astro writes every page as <path>/index.html; /auth and /auth/ both serve it, and /auth redirects to /auth/
+    "html_handling": "auto-trailing-slash",
+    // Unknown paths get dist/404.html with a 404 status
+    "not_found_handling": "404-page"
+  },
+  // Served on docs.feedfabric.dev (Cloudflare creates the DNS record and certificate on deploy; the feedfabric.dev
+  // zone must be on the same account), and on <name>.<your-subdomain>.workers.dev
+  "routes": [{ "pattern": "docs.feedfabric.dev", "zone_name": "feedfabric.dev", "custom_domain": true }],
+  "workers_dev": true,
+  "preview_urls": true
+}
