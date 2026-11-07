@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:5162/"
+      "url": "http://localhost:5199/"
     }
   ],
   "paths": {
@@ -143,6 +143,28 @@
                 }
               }
             }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/me/export": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -790,6 +812,26 @@
     },
     "/admin/users/{externalUserId}": {
       "get": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "parameters": [
+          {
+            "name": "externalUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
         "tags": [
           "AdminUsers"
         ],
@@ -2867,6 +2909,7 @@
         "type": "object",
         "properties": {
           "content": {
+            "maxLength": 2000,
             "type": "string"
           },
           "parentCommentId": {
@@ -3672,6 +3715,7 @@
         "type": "object",
         "properties": {
           "content": {
+            "maxLength": 5000,
             "type": "string"
           },
           "mediaIds": {
@@ -4216,6 +4260,9 @@
   "tags": [
     {
       "name": "FeedFabric.Api"
+    },
+    {
+      "name": "Account"
     },
     {
       "name": "Admin"
