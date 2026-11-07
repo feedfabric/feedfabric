@@ -1,0 +1,35 @@
+# Weekly update pull requests for every dependency manifest. CI (ci.yml) builds, tests and scans each one.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Released together; one PR keeps them on the same version
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+      opentelemetry:
+        patterns: ["OpenTelemetry*", "Npgsql.OpenTelemetry"]
+      testcontainers:
+        patterns: ["Testcontainers*"]
+
+  - package-ecosystem: npm
+    directories: [/web/admin, /web/docs, /web/fabric-ui]
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: uv
+    directory: /ml
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directories: [/src/FeedFabric.Api, /src/FeedFabric.Worker.Events, /src/FeedFabric.Application]
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

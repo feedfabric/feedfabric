@@ -2,6 +2,8 @@
 #   docker build -f src/FeedFabric.Api/Dockerfile -t feedfabric-api .
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# Security fixes Ubuntu has published since Microsoft last rebuilt the base image (CI's Trivy scan fails on them)
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

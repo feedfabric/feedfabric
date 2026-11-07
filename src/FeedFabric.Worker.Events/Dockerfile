@@ -3,8 +3,10 @@
 
 # aspnet rather than runtime: the worker serves /health/live and /health/ready on 8080
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-# librdkafka looks for the Kerberos library at startup and logs an error without it
-RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+# librdkafka looks for the Kerberos library at startup and logs an error without it. The upgrade takes security
+# fixes Ubuntu has published since Microsoft last rebuilt the base image (CI's Trivy scan fails on them).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

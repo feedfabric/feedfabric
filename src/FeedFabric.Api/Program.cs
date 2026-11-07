@@ -51,6 +51,8 @@ builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = bui
 
 // Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
 builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
+// No "Server: Kestrel" on responses
+builder.Services.PostConfigure<KestrelServerOptions>(options => options.AddServerHeader = false);
 
 // Add services to the container.
 // Pooled: contexts are reset and reused across requests instead of being built for each one
@@ -176,6 +178,7 @@ if (proxy.Enabled)
 {
     app.UseForwardedHeaders();
 }
+app.UseMiddleware<SecurityHeaders>();
 // Kestrel's own refusals (a body over the limit is 413) keep their status rather than becoming a 500
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
@@ -209,6 +212,7 @@ app.UseRateLimiter();
 // A signed-in user's first request creates their FeedFabric user from the token
 app.UseMiddleware<UserProvisioning>();
 app.UseMiddleware<SuspendedUsers>();
+app.UseMiddleware<StaffAudit>();
 
 app.MapControllers();
 app.MapFeedFabricHealth();

@@ -147,12 +147,31 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      # Pull requests build the image to prove it builds, without pushing it
+      # Built into the local Docker first, so it can be scanned before anything is pushed
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
+          tags: scan/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+      # Fails on a fixable critical or high vulnerability in the OS packages or the .NET dependencies. 0.35.0 or
+      # later only: earlier tags were rewritten in the March 2026 supply-chain compromise (CVE-2026-33634).
+      - uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: scan/${{ matrix.image }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # Pull requests build and scan the image to prove it's fine, without pushing it
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}
