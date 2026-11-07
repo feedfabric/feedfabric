@@ -42,7 +42,7 @@ public class ValidationTests(ApiFactory api)
     {
         var client = api.ClientFor("validation-3");
         // Over Kestrel:Limits:MaxRequestBodySize (1 MB)
-        var content = new StringContent($$"""{"content":"{{new string('a', 1_100_000)}}"}""", System.Text.Encoding.UTF8, "application/json");
+        using var content = new StringContent($$"""{"content":"{{new string('a', 1_100_000)}}"}""", System.Text.Encoding.UTF8, "application/json");
         var response = await client.PostAsync("/userfeed/posts", content, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);

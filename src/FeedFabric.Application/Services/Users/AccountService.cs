@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Messaging;
@@ -9,7 +10,7 @@ namespace FeedFabric.Application.Services.Users;
 
 // A member's own account: deleting it (the right to erasure) and exporting everything held about them (subject
 // access). docs/data-retention.md says what is kept, for how long, and what deletion leaves behind.
-public class AccountService(AppDbContext db, IConnectionMultiplexer redis, IBlobStorage storage, TimeProvider timeProvider)
+public class AccountService(AppDbContext db, IConnectionMultiplexer redis, IBlobStorage storage, TimeProvider timeProvider, ILogger<AccountService> logger)
 {
     private static readonly TimeSpan ExportUrlLifetime = TimeSpan.FromHours(1);
 
@@ -120,8 +121,9 @@ public class AccountService(AppDbContext db, IConnectionMultiplexer redis, IBlob
                     .Select(a => new ExportedScore(names[a.Second], a.First.Score)).ToList(),
                 topics.Select(t => new ExportedScore(t.Element.ToString(), t.Score)).ToList());
         }
-        catch (RedisException)
+        catch (RedisException ex)
         {
+            logger.LogWarning(ex, "Exporting account {UserId} without its interests: Redis is unavailable", id);
         }
 
         var feedLog = db.FeedLog.AsNoTracking().Where(f => f.ViewerId == id).OrderBy(f => f.Id)

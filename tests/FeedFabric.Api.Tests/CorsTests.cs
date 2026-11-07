@@ -13,7 +13,7 @@ public class CorsTests(CorsFactory api) : IClassFixture<CorsFactory>
 {
     private async Task<HttpResponseMessage> PreflightAsync(string origin)
     {
-        var request = new HttpRequestMessage(HttpMethod.Options, "/userfeed/posts");
+        using var request = new HttpRequestMessage(HttpMethod.Options, "/userfeed/posts");
         request.Headers.Add("Origin", origin);
         request.Headers.Add("Access-Control-Request-Method", "POST");
         request.Headers.Add("Access-Control-Request-Headers", "authorization,content-type");

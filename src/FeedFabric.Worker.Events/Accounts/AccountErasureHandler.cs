@@ -83,12 +83,9 @@ public class AccountErasureHandler(
         var media = await db.Media.Where(m => m.OwnerId == userId).ToListAsync(cancellationToken);
         foreach (var m in media)
         {
-            foreach (var key in new[] { m.QuarantineKey, m.LargeKey, m.ThumbnailKey })
+            foreach (var key in new[] { m.QuarantineKey, m.LargeKey, m.ThumbnailKey }.OfType<string>())
             {
-                if (key is not null)
-                {
-                    await storage.DeleteAsync(key, cancellationToken);
-                }
+                await storage.DeleteAsync(key, cancellationToken);
             }
         }
         var mediaIds = media.Select(m => m.Id).ToList();

@@ -98,12 +98,9 @@ public class RetentionService(
             }
             foreach (var media in batch)
             {
-                foreach (var key in new[] { media.QuarantineKey, media.LargeKey, media.ThumbnailKey })
+                foreach (var key in new[] { media.QuarantineKey, media.LargeKey, media.ThumbnailKey }.OfType<string>())
                 {
-                    if (key is not null)
-                    {
-                        await storage.DeleteAsync(key, cancellationToken);
-                    }
+                    await storage.DeleteAsync(key, cancellationToken);
                 }
             }
             db.Media.RemoveRange(batch);

@@ -13,7 +13,7 @@ namespace FeedFabric.Api.Tests;
 // a free port. The models come from the repo's .blobs folder (make models); tests that need them skip without them.
 public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private static readonly string RepoBlobs = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.blobs"));
+    private static readonly string RepoBlobs = Path.GetFullPath(Path.Join(AppContext.BaseDirectory, "../../../../../.blobs"));
 
     private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:17").Build();
     private readonly RedisContainer redis = new RedisBuilder("valkey/valkey:8").Build();
@@ -26,16 +26,16 @@ public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public string RedisConnectionString => redis.GetConnectionString();
 
-    public static bool ModelsPresent => File.Exists(Path.Combine(RepoBlobs, "models/safety/toxicity/meta.json"));
+    public static bool ModelsPresent => File.Exists(Path.Join(RepoBlobs, "models/safety/toxicity/meta.json"));
 
     public async ValueTask InitializeAsync()
     {
         // Real Kestrel rather than the in-memory test server, so its limits (Kestrel:Limits) apply as in production
         UseKestrel(0);
         await Task.WhenAll(postgres.StartAsync(), redis.StartAsync());
-        if (Directory.Exists(Path.Combine(RepoBlobs, "models")))
+        if (Directory.Exists(Path.Join(RepoBlobs, "models")))
         {
-            Directory.CreateSymbolicLink(Path.Combine(blobs, "models"), Path.Combine(RepoBlobs, "models"));
+            Directory.CreateSymbolicLink(Path.Join(blobs, "models"), Path.Join(RepoBlobs, "models"));
         }
     }
 
