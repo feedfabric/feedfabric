@@ -42,6 +42,7 @@ public static class ProblemResults
         409 => ErrorCodes.Conflict,
         413 => ErrorCodes.RequestTooLarge,
         415 => ErrorCodes.UnsupportedMediaType,
+        429 => ErrorCodes.RateLimited,
         _ => ErrorCodes.InternalError,
     };
 }

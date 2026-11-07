@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Users;
@@ -8,6 +10,7 @@ using FeedFabric.Application.Services.Users;
 namespace FeedFabric.Api.Controllers;
 
 [ApiController]
+[EnableRateLimiting(RateLimitPolicies.Reactions)]
 [Authorize]
 [Route("userfeed/posts/{postId:guid}/like")]
 public class LikesController(ILikeService likeService, ICurrentUser currentUser) : ControllerBase

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Users;
@@ -13,6 +15,7 @@ namespace FeedFabric.Api.Controllers;
 public class ReportsController(ReportService reports, ICurrentUser currentUser) : ControllerBase
 {
     // POST /userfeed/posts/{postId}/report { "reason": "harassment" }; reporting twice counts once
+    [EnableRateLimiting(RateLimitPolicies.Reports)]
     [HttpPost("posts/{postId:guid}/report")]
     public async Task<IActionResult> ReportPost(Guid postId, ReportRequest request, CancellationToken cancellationToken)
     {
@@ -21,6 +24,7 @@ public class ReportsController(ReportService reports, ICurrentUser currentUser) 
     }
 
     // POST /userfeed/comments/{commentId}/report { "reason": "spam" }
+    [EnableRateLimiting(RateLimitPolicies.Reports)]
     [HttpPost("comments/{commentId:guid}/report")]
     public async Task<IActionResult> ReportComment(Guid commentId, ReportRequest request, CancellationToken cancellationToken)
     {

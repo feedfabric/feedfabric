@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Auth;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Ranking.Profiles;
@@ -77,6 +79,7 @@ public class RankingProfilesController(RankingProfileStore store, ForYouService 
 
     // POST /ranking/preview?viewer=<externalUserId>&limit=30: the feed these settings would give, without saving
     // anything or logging it. viewer defaults to you.
+    [EnableRateLimiting(RateLimitPolicies.RankingPreview)]
     [HttpPost("preview")]
     public async Task<ActionResult<ForYouResponse>> Preview(RankingProfile profile, [FromQuery] string? viewer, [FromQuery] int limit = 30,
         CancellationToken cancellationToken = default)

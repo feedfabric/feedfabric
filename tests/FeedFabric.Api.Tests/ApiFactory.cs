@@ -11,7 +11,7 @@ namespace FeedFabric.Api.Tests;
 // The API against real Postgres and Redis in containers, started once for every test in the "api" collection. It runs
 // as Development, so startup migrates the database and Dev auth trusts the test's unsigned tokens. Kestrel listens on
 // a free port. The models come from the repo's .blobs folder (make models); tests that need them skip without them.
-public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private static readonly string RepoBlobs = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.blobs"));
 

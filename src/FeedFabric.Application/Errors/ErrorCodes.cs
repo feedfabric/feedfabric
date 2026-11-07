@@ -15,6 +15,8 @@ public static class ErrorCodes
     public const string UnsupportedMediaType = "unsupported_media_type";
     // Over the request body limit (Kestrel:Limits:MaxRequestBodySize)
     public const string RequestTooLarge = "request_too_large";
+    // Too many requests of one kind in a short time (RateLimits); params: { retryAfterSeconds }, also in Retry-After
+    public const string RateLimited = "rate_limited";
     public const string InternalError = "internal_error";
 
     // Users and posts

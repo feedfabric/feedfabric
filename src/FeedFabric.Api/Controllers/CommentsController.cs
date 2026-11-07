@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Users;
@@ -29,6 +31,7 @@ public class CommentsController(ICommentService commentService, ICurrentUser cur
     }
 
     // POST /userfeed/posts/{postId}/comments; set parentCommentId in the body to reply to a comment
+    [EnableRateLimiting(RateLimitPolicies.Commenting)]
     [HttpPost("posts/{postId:guid}/comments")]
     public async Task<ActionResult<CommentResponse>> Create(Guid postId, CommentRequest request, CancellationToken cancellationToken)
     {
@@ -38,6 +41,7 @@ public class CommentsController(ICommentService commentService, ICurrentUser cur
             : ToProblem(result.Status, result.Violation);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Commenting)]
     [HttpDelete("comments/{commentId:guid}")]
     public async Task<IActionResult> Delete(Guid commentId, CancellationToken cancellationToken)
     {

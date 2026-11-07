@@ -7,6 +7,7 @@ using FeedFabric.Api.Admin;
 using FeedFabric.Api.Dev;
 using FeedFabric.Api.Storage;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
@@ -95,6 +96,8 @@ builder.Services.AddFeedFabricAuth(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment).AddModerationPolicies(builder.Environment)
     .AddAdminPolicies(builder.Environment);
 builder.Services.AddHttpContextAccessor();
+// Per-user limits on writes, signals and previews (RateLimitOptions)
+builder.Services.AddFeedFabricRateLimiting(builder.Configuration);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 // Every error, including auth, routing and unhandled exceptions, is Problem Details with a "code"
 builder.Services.AddProblemDetails(options =>
@@ -145,6 +148,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+// After authentication, so limits are counted per user
+app.UseRateLimiter();
 // A signed-in user's first request creates their FeedFabric user from the token
 app.UseMiddleware<UserProvisioning>();
 app.UseMiddleware<SuspendedUsers>();
