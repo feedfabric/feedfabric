@@ -65,6 +65,9 @@ your platform's secret store, passed in as environment variables.
 
 ## Deploying
 
+[Deploying FeedFabric](/deploy/) walks through a complete setup, and [Cloudflare](/deploy/cloudflare/) the parts
+that can run there. In brief:
+
 - **Images:** CI publishes `api`, `worker-events` and `migrations` to GHCR, tagged `sha-<short>` (and `1.2.3` for a
   release tag), after a Trivy scan. Deploy by tag, not `latest`. The API and the worker listen on 8080.
 - **Order:** run the `migrations` image to completion, then roll out the worker, then the API, each instance passing

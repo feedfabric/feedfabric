@@ -70,7 +70,8 @@ likes. Then every remaining post is scored.
 
 ## 4. Scoring
 
-The profile's scoring mode decides the score; the response's `ranker` says what was used.
+[How a score is made](/formulas/) has every number in this step and the next, with worked examples. The profile's
+scoring mode decides the score; the response's `ranker` says what was used.
 
 | Mode | Score | `ranker` |
 |---|---|---|

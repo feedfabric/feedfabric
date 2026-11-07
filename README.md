@@ -101,7 +101,7 @@ After the simulator has run for a while, run `make train` to train the For You r
 | `make backfill` | Seed users and backfill demo history on a fresh database, on your machine at low priority, then stop |
 | `make simulate` / `make simulate-stop` | Start or stop the simulator in Docker (`Simulator__Live=true` keeps it posting after the backfill) |
 | `make admin` / `make admin-build` | Run the admin panel with hot reload at http://localhost:5185; build it as a static site into `web/admin/dist` |
-| `make docs` | The docs site at http://localhost:5186: how it all works, and a guide to building a front end on the API (`web/docs`) |
+| `make docs` | The docs site at http://localhost:5186: how it all works, scoring formulas, building a front end on the API, and deploying (`web/docs`; `npm run deploy` there publishes it to Cloudflare) |
 | `make openapi` | Save the running API's OpenAPI document into the admin panel's API reference (`web/admin/public/openapi.json`) |
 | `make models` | Download the pretrained models into `.blobs/models` |
 | `make tune-toxicity` | Fine-tune the offensive-language model on this app's wording and publish it to `.blobs` (about 45 minutes) |

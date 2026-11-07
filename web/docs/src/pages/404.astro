@@ -1,0 +1,13 @@
+---
+import Doc from '../layouts/Doc.astro'
+---
+
+<Doc title="Page not found" description="There's no page at this address. It may have moved when the docs were reorganised." index={false}>
+  <p>Try searching (press <kbd>/</kbd>), or start from one of these:</p>
+  <div class="cards">
+    <a href="/"><strong>Overview</strong><span>What FeedFabric is and how the parts fit together.</span></a>
+    <a href="/running-locally/"><strong>Run it locally</strong><span>Docker, make targets and the simulator.</span></a>
+    <a href="/formulas/"><strong>Formulas</strong><span>How a For You score is made, and how to write your own.</span></a>
+    <a href="/deploy/"><strong>Deploy it</strong><span>Images, infrastructure, secrets, migrations and models.</span></a>
+  </div>
+</Doc>
