@@ -25,37 +25,74 @@ public static class DiversityReranker
         var feed = new List<Candidate>(byScore.Count);
         var explored = new HashSet<Guid>();
         var propensities = new Dictionary<Guid, double>();
+        // What the rules look back at, worked out once per slot rather than for every candidate tried in it
+        var authorCounts = new Dictionary<Guid, int>();
+        var lastTopics = new List<string?>(Math.Max(0, rules.TopicRun));
+        var pool = new List<int>();
 
         while (remaining.Count > 0)
         {
             var slot = feed.Count % window;
-            var recent = feed.Skip(Math.Max(0, feed.Count - (window - 1))).ToList();
-            var thisWindow = feed.Skip(feed.Count - slot).ToList();
+            var recentStart = Math.Max(0, feed.Count - (window - 1));
+            authorCounts.Clear();
+            for (var i = recentStart; i < feed.Count; i++)
+            {
+                authorCounts[feed[i].AuthorId] = authorCounts.GetValueOrDefault(feed[i].AuthorId) + 1;
+            }
+            lastTopics.Clear();
+            for (var i = Math.Max(recentStart, feed.Count - rules.TopicRun); i < feed.Count; i++)
+            {
+                lastTopics.Add(feed[i].Topic);
+            }
 
-            (Candidate Candidate, int Rank)? pick = null;
+            bool Fits(Candidate candidate) =>
+                authorCounts.GetValueOrDefault(candidate.AuthorId) < rules.AuthorCap && FitsTopic(candidate, lastTopics, rules);
+
+            var pick = -1;
 
             if (exploreSlots.Contains(slot))
             {
-                var pool = remaining.Where(r => r.Rank >= rules.ExploreFrom && Fits(r.Candidate, recent, rules)).ToList();
+                pool.Clear();
+                for (var i = 0; i < remaining.Count; i++)
+                {
+                    if (remaining[i].Rank >= rules.ExploreFrom && Fits(remaining[i].Candidate))
+                    {
+                        pool.Add(i);
+                    }
+                }
                 if (pool.Count > 0)
                 {
                     pick = pool[random.Next(pool.Count)];
-                    explored.Add(pick.Value.Candidate.Post.PostId);
-                    propensities[pick.Value.Candidate.Post.PostId] = 1.0 / pool.Count;
+                    var postId = remaining[pick].Candidate.Post.PostId;
+                    explored.Add(postId);
+                    propensities[postId] = 1.0 / pool.Count;
                 }
             }
 
             // Running short of posts from outside your follows in this window: take the best one that fits
-            var outOfNetworkShown = thisWindow.Count(c => !c.InNetwork);
+            var outOfNetworkShown = 0;
+            for (var i = feed.Count - slot; i < feed.Count; i++)
+            {
+                outOfNetworkShown += feed[i].InNetwork ? 0 : 1;
+            }
             var slotsLeft = window - slot;
             var needOutside = rules.OutOfNetwork > 0 && rules.OutOfNetwork - outOfNetworkShown >= slotsLeft;
 
-            pick ??= remaining.Where(r => (!needOutside || !r.Candidate.InNetwork) && Fits(r.Candidate, recent, rules)).Cast<(Candidate, int)?>().FirstOrDefault()
-                ?? remaining.Where(r => Fits(r.Candidate, recent, rules)).Cast<(Candidate, int)?>().FirstOrDefault()
-                ?? remaining[0];
+            if (pick < 0 && needOutside)
+            {
+                pick = remaining.FindIndex(r => !r.Candidate.InNetwork && Fits(r.Candidate));
+            }
+            if (pick < 0)
+            {
+                pick = remaining.FindIndex(r => Fits(r.Candidate));
+            }
+            if (pick < 0)
+            {
+                pick = 0;
+            }
 
-            remaining.Remove(pick.Value);
-            feed.Add(pick.Value.Candidate);
+            feed.Add(remaining[pick].Candidate);
+            remaining.RemoveAt(pick);
         }
 
         return feed.Select(c => explored.Contains(c.Post.PostId)
@@ -63,14 +100,21 @@ public static class DiversityReranker
             : c.Post).ToList();
     }
 
-    private static bool Fits(Candidate candidate, List<Candidate> recent, DiversityRules rules)
+    // No more than TopicRun in a row on one topic: blocked only when the last TopicRun posts are all on this one
+    private static bool FitsTopic(Candidate candidate, List<string?> lastTopics, DiversityRules rules)
     {
-        if (recent.Count(c => c.AuthorId == candidate.AuthorId) >= rules.AuthorCap)
+        if (candidate.Topic is null || lastTopics.Count < rules.TopicRun)
         {
-            return false;
+            return true;
         }
-        var lastTopics = recent.TakeLast(rules.TopicRun).Select(c => c.Topic).ToList();
-        return candidate.Topic is null || lastTopics.Count < rules.TopicRun || lastTopics.Any(t => t != candidate.Topic);
+        foreach (var topic in lastTopics)
+        {
+            if (topic != candidate.Topic)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
 

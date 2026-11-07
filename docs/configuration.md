@@ -15,7 +15,7 @@ The environment is `ASPNETCORE_ENVIRONMENT` for the API and `DOTNET_ENVIRONMENT`
 Anything other than `Development` is treated as production. Development is the only environment where:
 
 - `Auth:Mode` can be `Dev` (any token, or `X-Dev-User`, is trusted), and any signed-in user is staff in the admin panel
-- the API migrates the database and seeds dev users on startup
+- the API, the worker and the simulator migrate the database on startup, and the API seeds dev users
 - the API serves its OpenAPI document
 
 ### As environment variables

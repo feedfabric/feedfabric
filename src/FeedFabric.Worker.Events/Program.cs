@@ -17,7 +17,8 @@ using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Pooled: each event gets its own scope, and so a context, which is reset and reused rather than built again
+builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -55,6 +56,14 @@ builder.Services.AddHostedService<MediaEventsConsumer>();
 builder.Services.AddHostedService<PostEmbeddingsConsumer>();
 
 var host = builder.Build();
+
+// Local dev: bring the database up to date on startup, so this runs on a fresh database whether or not the API has
+// started yet. Other environments migrate as a deploy step.
+if (host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
+{
+    using var scope = host.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+}
 
 if (!host.Services.GetRequiredService<IOptions<MalwareScanningOptions>>().Value.Enabled)
 {

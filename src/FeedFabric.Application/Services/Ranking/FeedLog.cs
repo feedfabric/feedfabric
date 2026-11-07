@@ -89,13 +89,22 @@ public class FeedLog(AppDbContext db, IConnectionMultiplexer redis, TimeProvider
         };
     }
 
+    // One UPDATE for the whole beacon rather than one per post: each post's total is joined in from a pair of arrays
     public async Task AddDwellAsync(Guid viewerId, IReadOnlyCollection<(Guid PostId, int Ms)> views, CancellationToken cancellationToken)
     {
-        foreach (var group in views.GroupBy(v => v.PostId))
+        var totals = views.GroupBy(v => v.PostId).Select(g => (PostId: g.Key, Ms: g.Sum(v => v.Ms))).ToList();
+        if (totals.Count == 0)
         {
-            var ms = group.Sum(v => v.Ms);
-            await Recent(viewerId, [group.Key]).ExecuteUpdateAsync(s => s.SetProperty(f => f.DwellMs, f => f.DwellMs + ms), cancellationToken);
+            return;
         }
+        var postIds = totals.Select(t => t.PostId).ToArray();
+        var ms = totals.Select(t => t.Ms).ToArray();
+        var since = timeProvider.GetUtcNow().UtcDateTime - AttributionWindow;
+        await db.Database.ExecuteSqlAsync($"""
+            UPDATE "FeedLog" f SET "DwellMs" = f."DwellMs" + v.ms
+            FROM unnest({postIds}, {ms}) AS v(post_id, ms)
+            WHERE f."ViewerId" = {viewerId} AND f."PostId" = v.post_id AND f."ServedAt" >= {since}
+            """, cancellationToken);
     }
 
     private IQueryable<FeedLogEntity> Recent(Guid viewerId, IReadOnlyCollection<Guid> postIds)

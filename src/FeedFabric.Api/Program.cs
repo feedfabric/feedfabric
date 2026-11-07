@@ -31,7 +31,8 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Pooled: contexts are reset and reused across requests instead of being built for each one
+builder.Services.AddDbContextPool<AppDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
 

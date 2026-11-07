@@ -26,10 +26,13 @@ public static class DashboardEndpoints
             var posts = await db.Posts.CountAsync(p => p.CreatedAt >= since && p.DeletedAt == null && p.RepostOfId == null, cancellationToken);
             var likes = await db.Likes.CountAsync(l => l.CreatedAt >= since, cancellationToken);
             var comments = await db.Comments.CountAsync(c => c.CreatedAt >= since && c.DeletedAt == null, cancellationToken);
-            var actors = (await db.Posts.Where(p => p.CreatedAt >= since).Select(p => p.AuthorId).Distinct().ToListAsync(cancellationToken))
-                .Concat(await db.Likes.Where(l => l.CreatedAt >= since).Select(l => l.UserId).Distinct().ToListAsync(cancellationToken))
-                .Concat(await db.Comments.Where(c => c.CreatedAt >= since).Select(c => c.AuthorId).Distinct().ToListAsync(cancellationToken))
-                .Distinct().Count();
+            // Counted in Postgres, so a busy window doesn't bring every active user's ID back to count here
+            var actors = await db.Database.SqlQuery<int>($"""
+                SELECT count(*)::int AS "Value" FROM (
+                    SELECT "AuthorId" FROM "Posts" WHERE "CreatedAt" >= {since}
+                    UNION SELECT "UserId" FROM "Likes" WHERE "CreatedAt" >= {since}
+                    UNION SELECT "AuthorId" FROM "Comments" WHERE "CreatedAt" >= {since}) a
+                """).SingleAsync(cancellationToken);
 
             // Per minute: posts, likes and comments from Postgres, impressions from Redis
             var signalSeries = await impressions.PerMinuteAsync(Math.Min(window, 360));
@@ -126,9 +129,18 @@ public static class DashboardEndpoints
             // Pipeline: events waiting to be published, and when each consumer last finished one
             var outboxWaiting = await db.OutboxMessages.CountAsync(o => o.ProcessedAt == null, cancellationToken);
             var oldestWaiting = await db.OutboxMessages.Where(o => o.ProcessedAt == null).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
-            var consumers = await db.ProcessedEvents.GroupBy(e => e.Consumer)
-                .Select(g => new { Consumer = g.Key, LastProcessedAt = g.Max(e => e.ProcessedAt) })
-                .ToListAsync(cancellationToken);
+            // A GROUP BY would read every row the consumers ever processed; this hops from one consumer to the next
+            // on the (Consumer, ProcessedAt) index and reads one row for each
+            var consumers = await db.Database.SqlQuery<ConsumerProgress>($"""
+                WITH RECURSIVE c AS (
+                    (SELECT "Consumer" FROM "ProcessedEvents" ORDER BY "Consumer" LIMIT 1)
+                    UNION ALL
+                    SELECT (SELECT e."Consumer" FROM "ProcessedEvents" e WHERE e."Consumer" > c."Consumer" ORDER BY e."Consumer" LIMIT 1)
+                    FROM c WHERE c."Consumer" IS NOT NULL)
+                SELECT c."Consumer" AS "Consumer",
+                    (SELECT max(e."ProcessedAt") FROM "ProcessedEvents" e WHERE e."Consumer" = c."Consumer") AS "LastProcessedAt"
+                FROM c WHERE c."Consumer" IS NOT NULL
+                """).ToListAsync(cancellationToken);
             var lastMediaProcessed = await db.Media.MaxAsync(m => m.ProcessedAt, cancellationToken);
 
             // Ranking: For You against Following on the same simulated population (even-numbered users read For You).
@@ -229,6 +241,12 @@ public static class DashboardEndpoints
                 })
                 .ToList();
 
+            // Both in one pass over the log, which is the largest table
+            var training = await db.FeedLog.Where(f => f.Seen)
+                .GroupBy(_ => 1)
+                .Select(g => new { Rows = g.Count(), Positives = g.Count(f => f.Opened || f.Liked || f.Commented) })
+                .SingleOrDefaultAsync(cancellationToken);
+
             await model.EnsureLoadedAsync(cancellationToken);
             var ranking = new
             {
@@ -239,8 +257,8 @@ public static class DashboardEndpoints
                 Model = model.Info,
                 Experiment = experiment,
                 Profiles = byProfile,
-                TrainingRows = await db.FeedLog.CountAsync(f => f.Seen, cancellationToken),
-                TrainingPositives = await db.FeedLog.CountAsync(f => f.Seen && (f.Opened || f.Liked || f.Commented), cancellationToken),
+                TrainingRows = training?.Rows ?? 0,
+                TrainingPositives = training?.Positives ?? 0,
             };
 
             // Safety: what was blocked, or held for review, before anyone saw it. Reviewing happens in the admin app.
@@ -311,6 +329,13 @@ public static class DashboardEndpoints
         public required string Feed { get; set; }
 
         public double Share { get; set; }
+    }
+
+    private sealed class ConsumerProgress
+    {
+        public required string Consumer { get; set; }
+
+        public DateTime LastProcessedAt { get; set; }
     }
 
     private sealed class MinuteCount

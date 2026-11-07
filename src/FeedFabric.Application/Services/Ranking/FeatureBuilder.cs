@@ -70,9 +70,10 @@ public class FeatureBuilder(AppDbContext db, IConnectionMultiplexer redis, IImpr
 
         // How fast each post is picking up likes and comments right now
         var recentSince = now - VelocityWindow;
-        var velocity = (await db.Likes.Where(l => postIds.Contains(l.PostId) && l.CreatedAt >= recentSince).Select(l => l.PostId).ToListAsync(cancellationToken))
-            .Concat(await db.Comments.Where(c => postIds.Contains(c.PostId) && c.CreatedAt >= recentSince).Select(c => c.PostId).ToListAsync(cancellationToken))
-            .GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+        var velocity = await db.Likes.Where(l => postIds.Contains(l.PostId) && l.CreatedAt >= recentSince).Select(l => l.PostId)
+            .Concat(db.Comments.Where(c => postIds.Contains(c.PostId) && c.CreatedAt >= recentSince).Select(c => c.PostId))
+            .GroupBy(id => id).Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
 
         // The viewer's own history with each author: how often they opened that author's posts after seeing them
         var historySince = now - AuthorHistory;
@@ -93,11 +94,13 @@ public class FeatureBuilder(AppDbContext db, IConnectionMultiplexer redis, IImpr
         var postVectors = viewer is null ? [] : await embeddings.GetAsync(postIds);
 
         var database = redis.GetDatabase();
-        var affinityTasks = authorIds.ToDictionary(a => a, a => database.SortedSetScoreAsync(EngagementKeys.Affinity(viewerId), a.ToString()));
+        // Every author's affinity in one ZMSCORE rather than a command each
+        var affinityTask = database.SortedSetScoresAsync(EngagementKeys.Affinity(viewerId), authorIds.Select(a => (RedisValue)a.ToString()).ToArray());
         var topicsTask = database.SortedSetRangeByRankWithScoresAsync(EngagementKeys.Topics(viewerId), 0, -1, Order.Descending);
         var signalsTask = impressions.SignalsAsync(postIds);
-        await Task.WhenAll(affinityTasks.Values.Cast<Task>().Append(topicsTask).Append(signalsTask));
+        await Task.WhenAll(affinityTask, topicsTask, signalsTask);
 
+        var affinity = authorIds.Select((a, i) => (a, Score: affinityTask.Result[i] ?? 0)).ToDictionary(x => x.a, x => x.Score);
         var topics = topicsTask.Result.Where(t => t.Score > 0).ToDictionary(t => t.Element.ToString(), t => t.Score);
         var topicTotal = topics.Values.Sum();
         var signals = signalsTask.Result;
@@ -116,7 +119,7 @@ public class FeatureBuilder(AppDbContext db, IConnectionMultiplexer redis, IImpr
             [
                 Math.Max(0, (now - post.CreatedAt).TotalMinutes),
                 follows.Contains(post.AuthorId) ? 1 : 0,
-                affinityTasks[post.AuthorId].Result ?? 0,
+                affinity[post.AuthorId],
                 Math.Min(1, topicMatch),
                 likes.GetValueOrDefault(post.Id),
                 comments.GetValueOrDefault(post.Id),

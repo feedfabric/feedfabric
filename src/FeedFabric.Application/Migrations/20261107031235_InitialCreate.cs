@@ -31,6 +31,7 @@ namespace FeedFabric.Application.Migrations
                     Commented = table.Column<bool>(type: "boolean", nullable: false),
                     DwellMs = table.Column<int>(type: "integer", nullable: false),
                     NotInterested = table.Column<bool>(type: "boolean", nullable: false),
+                    ShowMore = table.Column<bool>(type: "boolean", nullable: false),
                     Explored = table.Column<bool>(type: "boolean", nullable: false),
                     Propensity = table.Column<double>(type: "double precision", nullable: false)
                 },
@@ -128,6 +129,31 @@ namespace FeedFabric.Application.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Favourites",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    FavouriteId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Favourites", x => new { x.UserId, x.FavouriteId });
+                    table.ForeignKey(
+                        name: "FK_Favourites_Users_FavouriteId",
+                        column: x => x.FavouriteId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Favourites_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Follows",
                 columns: table => new
                 {
@@ -167,6 +193,7 @@ namespace FeedFabric.Application.Migrations
                     Width = table.Column<int>(type: "integer", nullable: true),
                     Height = table.Column<int>(type: "integer", nullable: true),
                     RejectionReason = table.Column<string>(type: "text", nullable: true),
+                    NudityScore = table.Column<double>(type: "double precision", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
@@ -393,9 +420,15 @@ namespace FeedFabric.Application.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Comments_AuthorId",
+                name: "IX_Comments_AuthorId_CreatedAt",
                 table: "Comments",
-                column: "AuthorId");
+                columns: new[] { "AuthorId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Comments_CreatedAt",
+                table: "Comments",
+                column: "CreatedAt")
+                .Annotation("Npgsql:IndexMethod", "brin");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Comments_ParentCommentId_Id",
@@ -408,14 +441,19 @@ namespace FeedFabric.Application.Migrations
                 columns: new[] { "PostId", "ParentCommentId", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Favourites_FavouriteId",
+                table: "Favourites",
+                column: "FavouriteId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_FeedLog_ServedAt",
                 table: "FeedLog",
                 column: "ServedAt");
 
             migrationBuilder.CreateIndex(
-                name: "IX_FeedLog_ViewerId_PostId_ServedAt",
+                name: "IX_FeedLog_ViewerId_ServedAt_PostId",
                 table: "FeedLog",
-                columns: new[] { "ViewerId", "PostId", "ServedAt" });
+                columns: new[] { "ViewerId", "ServedAt", "PostId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Follows_FolloweeId_FollowerId",
@@ -423,9 +461,21 @@ namespace FeedFabric.Application.Migrations
                 columns: new[] { "FolloweeId", "FollowerId" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Likes_CreatedAt",
+                table: "Likes",
+                column: "CreatedAt")
+                .Annotation("Npgsql:IndexMethod", "brin");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Likes_PostId_UserId",
                 table: "Likes",
                 columns: new[] { "PostId", "UserId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Likes_UserId_CreatedAt",
+                table: "Likes",
+                columns: new[] { "UserId", "CreatedAt" })
+                .Annotation("Npgsql:IndexInclude", new[] { "PostId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Media_OwnerId_Status",
@@ -491,6 +541,12 @@ namespace FeedFabric.Application.Migrations
                 columns: new[] { "AuthorId", "Id" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Posts_CreatedAt",
+                table: "Posts",
+                column: "CreatedAt")
+                .Annotation("Npgsql:IndexMethod", "brin");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Posts_RepostOfId_AuthorId",
                 table: "Posts",
                 columns: new[] { "RepostOfId", "AuthorId" },
@@ -506,6 +562,11 @@ namespace FeedFabric.Application.Migrations
                 name: "IX_PostTags_Tag_PostId",
                 table: "PostTags",
                 columns: new[] { "Tag", "PostId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProcessedEvents_Consumer_ProcessedAt",
+                table: "ProcessedEvents",
+                columns: new[] { "Consumer", "ProcessedAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_RankingProfiles_Key_Version",
@@ -546,6 +607,9 @@ namespace FeedFabric.Application.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "Favourites");
+
             migrationBuilder.DropTable(
                 name: "FeedLog");
 

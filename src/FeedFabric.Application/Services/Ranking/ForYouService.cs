@@ -90,7 +90,7 @@ public class ForYouService(
         if (session is null)
         {
             session = await RankAsync(viewerId, profile, cancellationToken);
-            await redis.GetDatabase().StringSetAsync(key, JsonSerializer.Serialize(session), SessionLifetime);
+            await redis.GetDatabase().StringSetAsync(key, JsonSerializer.SerializeToUtf8Bytes(session), SessionLifetime);
         }
         return session;
     }
@@ -380,8 +380,9 @@ public class ForYouService(
 
     private async Task<Session?> LoadSessionAsync(string key)
     {
+        // As UTF-8 bytes both ways, so a session of hundreds of posts isn't also copied through a .NET string
         var json = await redis.GetDatabase().StringGetAsync(key);
-        return json.HasValue ? JsonSerializer.Deserialize<Session>(json.ToString()) : null;
+        return json.HasValue ? JsonSerializer.Deserialize<Session>((byte[])json!) : null;
     }
 
     // Per profile version, so switching profiles (or saving a new version) never pages through another one's order
