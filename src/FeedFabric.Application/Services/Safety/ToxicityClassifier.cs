@@ -66,7 +66,7 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
             if (session is null || tokenizer is null)
             {
                 await using var metaFile = await storage.GetAsync($"{Prefix}/meta.json", cancellationToken)
-                    ?? throw new InvalidOperationException($"No toxicity model at {Prefix}: run make models.");
+                    ?? throw new ModelNotFoundException($"No toxicity model at {Prefix}: run make models.");
                 using var meta = await JsonDocument.ParseAsync(metaFile.Content, cancellationToken: cancellationToken);
                 labels = meta.RootElement.GetProperty("labels").EnumerateArray().Select(l => l.GetString()!).ToArray();
                 maxTokens = meta.RootElement.GetProperty("maxTokens").GetInt32();
@@ -91,7 +91,7 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
     private async Task<MemoryStream> ReadAsync(string name, CancellationToken cancellationToken)
     {
         await using var file = await storage.GetAsync($"{Prefix}/{name}", cancellationToken)
-            ?? throw new InvalidOperationException($"No {name} for the toxicity model at {Prefix}: run make models.");
+            ?? throw new ModelNotFoundException($"No {name} for the toxicity model at {Prefix}: run make models.");
         var copy = new MemoryStream();
         await file.Content.CopyToAsync(copy, cancellationToken);
         copy.Position = 0;

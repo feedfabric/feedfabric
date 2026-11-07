@@ -7,6 +7,7 @@ using FeedFabric.Api.Auth;
 using FeedFabric.Api.Errors;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Scanning;
@@ -71,7 +72,7 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
     [HttpGet("system")]
     [Authorize(Policy = AdminPolicies.Staff)]
     public async Task<object> System(AppDbContext db, IBlobStorage storage, RankerModel ranker, IOptions<AuthOptions> auth,
-        IOptions<ModerationOptions> moderation, IOptions<MediaOptions> mediaOptions, IOptions<MalwareScanningOptions> scanning, TimeProvider timeProvider, CancellationToken cancellationToken)
+        IOptions<ModerationOptions> moderation, IOptions<MediaOptions> mediaOptions, IOptions<MalwareScanningOptions> scanning, IOptions<OutboxOptions> outbox, TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var models = new List<object>();
@@ -100,7 +101,8 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
 
         var a = auth.Value;
         var m = moderation.Value;
-        var oldestWaiting = await db.OutboxMessages.Where(o => o.ProcessedAt == null).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
+        var maxAttempts = outbox.Value.MaxPublishAttempts;
+        var oldestWaiting = await db.OutboxMessages.Waiting(maxAttempts).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
         return new
         {
             Environment = environment.EnvironmentName,
@@ -143,7 +145,9 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
                 .ToDictionaryAsync(g => g.Status.ToString().ToLowerInvariant(), g => g.Count, cancellationToken),
             Pipeline = new
             {
-                OutboxWaiting = await db.OutboxMessages.CountAsync(o => o.ProcessedAt == null, cancellationToken),
+                OutboxWaiting = await db.OutboxMessages.Waiting(maxAttempts).CountAsync(cancellationToken),
+                // Gave up after Outbox:MaxPublishAttempts; each needs a person (docs/runbooks.md)
+                OutboxParked = await db.OutboxMessages.Parked(maxAttempts).CountAsync(cancellationToken),
                 OldestWaitingSeconds = oldestWaiting is null ? (double?)null : Math.Round((now - oldestWaiting.Value).TotalSeconds),
                 Consumers = await db.ProcessedEvents.GroupBy(e => e.Consumer)
                     .Select(g => new { Consumer = g.Key, LastProcessedAt = g.Max(e => e.ProcessedAt) })

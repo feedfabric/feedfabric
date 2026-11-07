@@ -8,5 +8,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/FeedFabric.Api.Tests/FeedFabric.Api.Tests.csproj" />
     <Project Path="tests/FeedFabric.Application.Tests/FeedFabric.Application.Tests.csproj" />
+    <Project Path="tests/FeedFabric.Worker.Tests/FeedFabric.Worker.Tests.csproj" />
   </Folder>
 </Solution>

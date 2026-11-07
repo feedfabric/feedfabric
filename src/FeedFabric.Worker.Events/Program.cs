@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
@@ -25,14 +26,20 @@ builder.Services.AddSingleton(TimeProvider.System);
 var kafkaOptions = builder.Configuration.GetSection(KafkaOptions.Section).Get<KafkaOptions>() ?? new KafkaOptions();
 builder.Services.Configure<KafkaOptions>(builder.Configuration.GetSection(KafkaOptions.Section));
 builder.Services.Configure<FeedOptions>(builder.Configuration.GetSection(FeedOptions.Section));
+builder.Services.Configure<OutboxOptions>(builder.Configuration.GetSection(OutboxOptions.Section));
 
 // One producer for the whole process; it's thread-safe and batches internally
-builder.Services.AddSingleton(_ => new ProducerBuilder<string, string>(new ProducerConfig
+builder.Services.AddSingleton(_ =>
 {
-    BootstrapServers = kafkaOptions.BootstrapServers,
-    Acks = Acks.All,
-    EnableIdempotence = true,
-}).Build());
+    var config = new ProducerConfig
+    {
+        BootstrapServers = kafkaOptions.BootstrapServers,
+        Acks = Acks.All,
+        EnableIdempotence = true,
+    };
+    kafkaOptions.Security.ApplyTo(config);
+    return new ProducerBuilder<string, string>(config).Build();
+});
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379"));

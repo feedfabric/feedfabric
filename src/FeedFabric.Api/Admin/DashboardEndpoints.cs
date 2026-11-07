@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Impressions;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Tags;
 
@@ -16,7 +18,7 @@ public static class DashboardEndpoints
     public static void MapDashboardEndpoints(this WebApplication app)
     {
         app.MapGet("/admin/dashboard", async (int? minutes, AppDbContext db, IImpressionService impressions, ITagService tags, ReviewService reviews,
-            RankerModel model, TimeProvider timeProvider, CancellationToken cancellationToken) =>
+            RankerModel model, IOptions<OutboxOptions> outbox, TimeProvider timeProvider, CancellationToken cancellationToken) =>
         {
             var window = Math.Clamp(minutes ?? 60, 5, 24 * 60);
             var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -127,8 +129,10 @@ public static class DashboardEndpoints
                 .OrderByDescending(r => r.Count).ToListAsync(cancellationToken);
 
             // Pipeline: events waiting to be published, and when each consumer last finished one
-            var outboxWaiting = await db.OutboxMessages.CountAsync(o => o.ProcessedAt == null, cancellationToken);
-            var oldestWaiting = await db.OutboxMessages.Where(o => o.ProcessedAt == null).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
+            var maxAttempts = outbox.Value.MaxPublishAttempts;
+            var outboxWaiting = await db.OutboxMessages.Waiting(maxAttempts).CountAsync(cancellationToken);
+            var outboxParked = await db.OutboxMessages.Parked(maxAttempts).CountAsync(cancellationToken);
+            var oldestWaiting = await db.OutboxMessages.Waiting(maxAttempts).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
             // A GROUP BY would read every row the consumers ever processed; this hops from one consumer to the next
             // on the (Consumer, ProcessedAt) index and reads one row for each
             var consumers = await db.Database.SqlQuery<ConsumerProgress>($"""
@@ -317,6 +321,7 @@ public static class DashboardEndpoints
                 Pipeline = new
                 {
                     OutboxWaiting = outboxWaiting,
+                    OutboxParked = outboxParked,
                     OldestWaitingSeconds = oldestWaiting is null ? (double?)null : Math.Round((now - oldestWaiting.Value).TotalSeconds),
                     Consumers = consumers,
                 },

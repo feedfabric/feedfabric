@@ -112,6 +112,11 @@ const limits = (values: Record<string, number>) => Object.entries(values).map(([
           {{ fmt(info.pipeline.outboxWaiting) }}
           <span v-if="info.pipeline.oldestWaitingSeconds" class="muted"> · oldest {{ Math.round(info.pipeline.oldestWaitingSeconds) }}s</span>
         </dd>
+        <dt>Parked</dt>
+        <dd>
+          <span :class="info.pipeline.outboxParked ? 'badge bad' : ''">{{ fmt(info.pipeline.outboxParked) }}</span>
+          <span v-if="info.pipeline.outboxParked" class="muted"> · failed to publish too often; see the runbook</span>
+        </dd>
         <template v-for="c in info.pipeline.consumers" :key="c.consumer">
           <dt>{{ c.consumer }}</dt><dd>last event {{ ago(c.lastProcessedAt, now) }}</dd>
         </template>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Confluent.Kafka;
 using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Posts;
@@ -10,8 +11,9 @@ namespace FeedFabric.Worker.Events.Kafka;
 public class PostEventsConsumer(
     IServiceScopeFactory scopeFactory,
     IOptions<KafkaOptions> options,
+    IProducer<string, string> producer,
     TimeProvider timeProvider,
-    ILogger<PostEventsConsumer> logger) : EventConsumer(scopeFactory, options.Value.BootstrapServers, timeProvider, logger)
+    ILogger<PostEventsConsumer> logger) : EventConsumer(scopeFactory, options.Value, producer, timeProvider, logger)
 {
     protected override string Topic => Topics.Posts;
 

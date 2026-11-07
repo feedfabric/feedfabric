@@ -153,9 +153,9 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
             if (session is null || tokenizer is null)
             {
                 await using var vocab = await storage.GetAsync($"{Prefix}/vocab.txt", cancellationToken)
-                    ?? throw new InvalidOperationException($"No embedding model at {Prefix}: run make models.");
+                    ?? throw new ModelNotFoundException($"No embedding model at {Prefix}: run make models.");
                 await using var modelFile = await storage.GetAsync($"{Prefix}/model.onnx", cancellationToken)
-                    ?? throw new InvalidOperationException($"No embedding model at {Prefix}: run make models.");
+                    ?? throw new ModelNotFoundException($"No embedding model at {Prefix}: run make models.");
                 using var vocabCopy = new MemoryStream();
                 await vocab.Content.CopyToAsync(vocabCopy, cancellationToken);
                 vocabCopy.Position = 0;

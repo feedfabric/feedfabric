@@ -7,6 +7,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FeedFabric.Worker.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FeedFabric.Application\FeedFabric.Application.csproj" />
   </ItemGroup>
 
