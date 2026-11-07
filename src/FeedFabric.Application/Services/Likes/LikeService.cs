@@ -74,7 +74,7 @@ public class LikeService(AppDbContext db, FeedLog feedLog, TimeProvider timeProv
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         return authorId is null
-            ? (LikeResultStatus.PostNotFound, Guid.Empty, default)
+            ? (LikeResultStatus.PostNotFound, Guid.Empty, Guid.Empty)
             : (LikeResultStatus.Ok, userId.Value, authorId.Value);
     }
 }

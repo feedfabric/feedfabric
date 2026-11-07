@@ -89,9 +89,10 @@ public static class HealthCheckBuilderExtensions
 
         public IHealthChecksBuilder AddClamAv() =>
             builder.AddCheck<ClamAvHealthCheck>("clamav", HealthStatus.Unhealthy, [HealthTags.Ready]);
-
-        public IHealthChecksBuilder AddModels(HealthStatus failureStatus, params string[] prefixes) =>
-            builder.Add(new HealthCheckRegistration("models",
-                services => new ModelsHealthCheck(services.GetRequiredService<IBlobStorage>(), prefixes), failureStatus, [HealthTags.Ready]));
     }
+
+    // A classic extension method: inside the extension block, params gets the wrong nullability at call sites (CS8620)
+    public static IHealthChecksBuilder AddModels(this IHealthChecksBuilder builder, HealthStatus failureStatus, params string[] prefixes) =>
+        builder.Add(new HealthCheckRegistration("models",
+            services => new ModelsHealthCheck(services.GetRequiredService<IBlobStorage>(), prefixes), failureStatus, [HealthTags.Ready]));
 }

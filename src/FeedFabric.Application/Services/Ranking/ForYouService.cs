@@ -87,7 +87,10 @@ public class ForYouService(
     private async Task<Session> SessionAsync(Guid viewerId, int offset, ResolvedProfile profile, string key, CancellationToken cancellationToken)
     {
         var session = offset > 0 ? await LoadSessionAsync(key) : null;
-        if (session is not null) return session;
+        if (session is not null)
+        {
+            return session;
+        }
         session = await RankAsync(viewerId, profile, cancellationToken);
         await redis.GetDatabase().StringSetAsync(key, JsonSerializer.SerializeToUtf8Bytes(session), SessionLifetime);
         return session;

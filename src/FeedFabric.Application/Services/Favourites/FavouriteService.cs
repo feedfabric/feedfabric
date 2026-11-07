@@ -112,7 +112,7 @@ public class FavouriteService(AppDbContext db, IMediaService media, FeatureBuild
             return (FavouriteResultStatus.TargetNotFound, Guid.Empty, Guid.Empty);
         }
         return userId == favouriteId
-            ? (FavouriteResultStatus.CannotFavouriteSelf, Guid.Empty, default)
+            ? (FavouriteResultStatus.CannotFavouriteSelf, Guid.Empty, Guid.Empty)
             : (FavouriteResultStatus.Ok, userId.Value, favouriteId.Value);
     }
 }

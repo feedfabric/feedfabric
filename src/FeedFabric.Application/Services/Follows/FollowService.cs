@@ -50,7 +50,7 @@ public class FollowService(AppDbContext db, TimeProvider timeProvider) : IFollow
         }
 
         return followerId == followeeId
-            ? (FollowResultStatus.CannotFollowSelf, Guid.Empty, default)
+            ? (FollowResultStatus.CannotFollowSelf, Guid.Empty, Guid.Empty)
             : (FollowResultStatus.Ok, followerId.Value, followeeId.Value);
     }
 }

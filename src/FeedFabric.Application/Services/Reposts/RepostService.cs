@@ -84,7 +84,7 @@ public class RepostService(AppDbContext db, TimeProvider timeProvider) : IRepost
             .Select(id => (Guid?)id)
             .SingleOrDefaultAsync(cancellationToken);
         return originalId is null
-            ? (RepostResultStatus.PostNotFound, Guid.Empty, default)
+            ? (RepostResultStatus.PostNotFound, Guid.Empty, Guid.Empty)
             : (RepostResultStatus.Ok, userId.Value, originalId.Value);
     }
 }
