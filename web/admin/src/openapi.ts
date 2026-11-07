@@ -55,9 +55,9 @@ const TagNames: Record<string, string> = {
 }
 export const tagName = (tag: string) => TagNames[tag] ?? tag
 
-// Every operation, in the document's order. The template's /weatherforecast is left out.
+// Every operation, in the document's order
 export function endpoints(doc: OpenApiDocument): Endpoint[] {
-  return Object.entries(doc.paths).filter(([path]) => path !== '/weatherforecast').flatMap(([path, item]) =>
+  return Object.entries(doc.paths).flatMap(([path, item]) =>
     Methods.filter(m => item[m]).map(method => ({ method, path, tag: item[method]!.tags?.[0] ?? 'Other', operation: item[method]! })))
 }
 
