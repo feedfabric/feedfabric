@@ -7,7 +7,10 @@ const here = fileURLToPath(new URL('.', import.meta.url))
 const fabricStyles = fileURLToPath(new URL('../fabric-ui/src/styles', import.meta.url))
 
 export default defineConfig({
-  // A static site: npm run build writes it to dist/, to serve from anywhere
+  // The public address, for canonical links: SITE_URL=https://docs.example.org npm run build. Without it pages still
+  // work anywhere, just without canonical URLs.
+  site: process.env.SITE_URL || undefined,
+  // A static site: npm run build writes it to dist/, to serve from anywhere (Cloudflare: wrangler.jsonc)
   output: 'static',
   outDir: './dist',
   trailingSlash: 'ignore',

@@ -1,0 +1,12 @@
+# Response headers for Cloudflare's static assets (wrangler.jsonc). Other hosts ignore this file.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'
+
+# Astro's bundles have a content hash in their names, so they never change
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

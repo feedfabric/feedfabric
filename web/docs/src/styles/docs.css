@@ -34,7 +34,11 @@ body.fabric { min-height: 100dvh; background: var(--fabric-bg); overflow-x: hidd
 }
 .topbar button:hover { border-color: var(--fabric-line-strong); }
 .topbar svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.theme-toggle { margin-left: auto; }
+.search-open { margin-left: auto; color: var(--fabric-muted) !important; min-width: 180px; }
+.search-open kbd { margin-left: auto; padding: 0 6px; border: 1px solid var(--fabric-line); border-radius: 4px; font: 11px/18px var(--fabric-font-mono); color: var(--fabric-muted); }
+.topbar .github { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: var(--fabric-radius-md); border: 1px solid var(--fabric-line); background: var(--fabric-surface); color: var(--fabric-ink); font-size: var(--fabric-text-sm); text-decoration: none; }
+.topbar .github:hover { border-color: var(--fabric-line-strong); }
+.topbar svg .fill { fill: currentColor; stroke: none; }
 .theme-toggle svg { display: none; }
 .theme-toggle[data-choice="system"] .icon-system, .theme-toggle[data-choice="light"] .icon-light, .theme-toggle[data-choice="dark"] .icon-dark { display: block; }
 .nav-toggle { display: none !important; }
@@ -75,7 +79,8 @@ body.fabric { min-height: 100dvh; background: var(--fabric-bg); overflow-x: hidd
   .frame { display: block; }
   .nav-toggle { display: inline-flex !important; padding: 0 8px !important; }
   .brand-sub { display: none; }
-  .theme-label { display: none; }
+  .theme-label, .github-label, .search-label, .search-open kbd { display: none; }
+  .search-open { min-width: 0; padding: 0 8px !important; }
   .sidebar {
     position: fixed; z-index: 40; top: var(--topbar-h); left: 0; width: min(300px, 86vw); height: calc(100dvh - var(--topbar-h));
     background: var(--fabric-sunken); border-right: 1px solid var(--fabric-line); transform: translateX(-102%);
@@ -200,3 +205,26 @@ body.fabric { min-height: 100dvh; background: var(--fabric-bg); overflow-x: hidd
   .pager .next { grid-column: 1; }
   .prose h1 { font-size: var(--fabric-text-xl); }
 }
+
+/* "Edit this page" under each page */
+.edit { max-width: var(--measure); margin: var(--fabric-space-6) 0 0; font-size: var(--fabric-text-sm); }
+.edit a { color: var(--fabric-muted); text-underline-offset: 2px; }
+.edit a:hover { color: var(--fabric-accent); }
+.foot a { color: inherit; text-underline-offset: 2px; }
+
+/* Search: a dialog with Pagefind's UI in it, coloured with FabricUI's tokens */
+dialog.search {
+  width: min(680px, calc(100vw - 2 * var(--fabric-space-4))); max-height: min(80dvh, 720px); margin: 10dvh auto auto; padding: var(--fabric-space-4);
+  border: 1px solid var(--fabric-line); border-radius: var(--fabric-radius-lg); background: var(--fabric-surface); color: var(--fabric-ink);
+  box-shadow: var(--fabric-shadow-md); overflow-y: auto;
+  --pagefind-ui-scale: .85; --pagefind-ui-primary: var(--fabric-accent); --pagefind-ui-text: var(--fabric-ink);
+  --pagefind-ui-background: var(--fabric-surface); --pagefind-ui-border: var(--fabric-line); --pagefind-ui-tag: var(--fabric-sunken);
+  --pagefind-ui-border-width: 1px; --pagefind-ui-border-radius: 8px; --pagefind-ui-font: var(--fabric-font);
+}
+dialog.search::backdrop { background: var(--fabric-scrim); }
+.search-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--fabric-space-3); }
+.search-head .nav-title { padding: 0; margin: 0; }
+.search-close { height: 28px; padding: 0 8px; border-radius: var(--fabric-radius-sm); border: 1px solid var(--fabric-line); background: var(--fabric-sunken); color: var(--fabric-muted); font: 11px var(--fabric-font-mono); cursor: pointer; }
+.search-missing { color: var(--fabric-muted); font-size: var(--fabric-text-sm); }
+.search-missing code { font: .9em var(--fabric-font-mono); }
+.search mark { background: var(--fabric-accent-soft); color: var(--fabric-ink); }

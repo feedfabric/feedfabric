@@ -5,10 +5,19 @@
   "description": "FeedFabric's documentation site: how the system works, and how to build a front end on its API",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "build": "astro build && pagefind --site dist",
+    "preview": "astro preview",
+    "preview:cloudflare": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "astro": "7.4.7"
+  },
+  "devDependencies": {
+    "pagefind": "1.6.0",
+    "wrangler": "4.158.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
