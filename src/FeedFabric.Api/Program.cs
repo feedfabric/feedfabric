@@ -46,6 +46,9 @@ var builder = WebApplication.CreateBuilder(args);
 StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis");
 builder.AddFeedFabricTelemetry("feedfabric-api", [], []);
 
+// How long in-flight requests get to finish on SIGTERM; keep the orchestrator's grace period longer than this
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = builder.Configuration.GetValue("ShutdownTimeout", TimeSpan.FromSeconds(25)));
+
 // Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
 builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
 
@@ -134,6 +137,7 @@ builder.Services.AddHealthChecks()
 builder.Services.AddFeedFabricRateLimiting(builder.Configuration);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 // Every error, including auth, routing and unhandled exceptions, is Problem Details with a "code"
+builder.Services.AddExceptionHandler<DependencyDownHandler>();
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context =>
         context.ProblemDetails.Extensions.TryAdd("code", ProblemResults.CodeForStatus(context.ProblemDetails.Status)));

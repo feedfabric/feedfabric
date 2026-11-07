@@ -15,6 +15,24 @@ public class ClamAvScanner(IOptions<MalwareScanningOptions> options) : IMalwareS
     public async Task<ScanResult> ScanAsync(Stream content, CancellationToken cancellationToken)
     {
         var settings = options.Value.ClamAv;
+        var start = content.CanSeek ? content.Position : 0;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await ScanOnceAsync(content, cancellationToken);
+            }
+            catch (MalwareScanException ex) when (ex.InnerException is SocketException && content.CanSeek && attempt < settings.ConnectRetries)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1 << attempt), cancellationToken);
+                content.Position = start;
+            }
+        }
+    }
+
+    private async Task<ScanResult> ScanOnceAsync(Stream content, CancellationToken cancellationToken)
+    {
+        var settings = options.Value.ClamAv;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(settings.Timeout);
 

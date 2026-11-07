@@ -113,7 +113,13 @@ public sealed class S3BlobStorage : IBlobStorage, IDisposable
 
     private AmazonS3Client CreateClient(string? serviceUrl)
     {
-        var config = new AmazonS3Config { ForcePathStyle = options.ForcePathStyle };
+        var config = new AmazonS3Config
+        {
+            ForcePathStyle = options.ForcePathStyle,
+            Timeout = options.Timeout,
+            MaxErrorRetry = options.MaxRetries,
+            RetryMode = RequestRetryMode.Standard,
+        };
         if (string.IsNullOrEmpty(serviceUrl))
         {
             config.RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region);

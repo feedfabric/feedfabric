@@ -19,6 +19,9 @@ public static class ErrorCodes
     public const string RateLimited = "rate_limited";
     public const string InternalError = "internal_error";
 
+    // Postgres, Redis or blob storage is unreachable for now; Retry-After says when to try again
+    public const string ServiceUnavailable = "service_unavailable";
+
     // Users and posts
     public const string UserNotSynced = "user.not_synced";
     public const string UserSuspended = "user.suspended";

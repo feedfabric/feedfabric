@@ -34,6 +34,9 @@ if (args is ["healthcheck", ..])
 var builder = WebApplication.CreateSlimBuilder(args);
 StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis", "Kafka:BootstrapServers");
 builder.AddFeedFabricTelemetry("feedfabric-worker", [WorkerMetrics.Name], [WorkerMetrics.Name]);
+// How long consumers get to finish the event in hand and leave their group on SIGTERM; an event cut off is
+// redelivered, and handlers are idempotent. Keep the orchestrator's grace period longer than this.
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = builder.Configuration.GetValue("ShutdownTimeout", TimeSpan.FromSeconds(25)));
 
 // Pooled: each event gets its own scope, and so a context, which is reset and reused rather than built again
 builder.Services.AddDbContextPool<AppDbContext>(options =>

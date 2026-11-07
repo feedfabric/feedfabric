@@ -1,4 +1,6 @@
+using System.Net;
 using System.Net.Sockets;
+using Amazon.Runtime;
 using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using Npgsql;
@@ -16,7 +18,11 @@ public static class TransientFailures
         {
             if (ex is MalwareScanException or ModelNotFoundException or RedisConnectionException or RedisTimeoutException
                 or SocketException or TimeoutException or HttpRequestException
-                || ex is NpgsqlException { IsTransient: true })
+                || ex is NpgsqlException { IsTransient: true }
+                // S3 throttling or a server error, after the SDK's own retries, or no answer at all
+                || ex is AmazonServiceException { StatusCode: >= HttpStatusCode.InternalServerError or HttpStatusCode.TooManyRequests }
+                    or AmazonServiceException { ErrorCode: "SlowDown" or "Throttling" or "RequestTimeout" }
+                || ex is AmazonClientException)
             {
                 return true;
             }
