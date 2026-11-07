@@ -4,7 +4,7 @@ export ConnectionStrings__Default = Host=localhost;Port=$(POSTGRES_PORT);Databas
 
 EF = dotnet ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Api
 
-.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop backfill migrate migration admin admin-build fabric train tune-toxicity models
+.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop backfill migrate migration admin admin-build openapi docs fabric train tune-toxicity models
 
 up:
 	docker compose up -d --build
@@ -53,7 +53,7 @@ simulate:
 simulate-stop:
 	docker compose --profile sim rm -sf simulator
 
-# Admin panel with hot reload on http://localhost:5180; API calls go to the API on :5161 (override with API_URL)
+# Admin panel with hot reload on http://localhost:5185; API calls go to the API on :5161 (override with API_URL)
 admin:
 	cd web/admin && npm install --no-audit --no-fund && npm run dev
 
@@ -61,6 +61,17 @@ admin:
 # and /blobs to the API
 admin-build:
 	cd web/admin && npm install --no-audit --no-fund && npm run build
+
+# Saves the API's OpenAPI document into the admin panel (web/admin/public/openapi.json), for its API reference page.
+# Needs the API running in Development (make run). Commit the result whenever the API changes.
+openapi:
+	curl -sf http://localhost:5161/openapi/v1.json | python3 -m json.tool --indent 2 > web/admin/public/openapi.json.tmp \
+		|| { rm -f web/admin/public/openapi.json.tmp; exit 1; }
+	mv web/admin/public/openapi.json.tmp web/admin/public/openapi.json
+
+# The docs site: how FeedFabric works and how to build a front end on it, on http://localhost:5186
+docs:
+	cd web/docs && npm install --no-audit --no-fund && npm run dev
 
 # FabricUI's gallery: every component in every state, on http://localhost:5190
 fabric:

@@ -78,6 +78,7 @@ const toggleVerified = () => user.value && act(() => api.setVerified(props.exter
       <div v-if="user" class="actions">
         <span class="chip" :class="statusTone(user.status)">{{ user.status }}</span>
         <span v-if="user.isVerified" class="chip">verified</span>
+        <RouterLink :to="{ name: 'feed', params: { externalUserId } }" class="button">View their feed</RouterLink>
         <button :disabled="busy" @click="toggleVerified">{{ user.isVerified ? 'Remove verification' : 'Verify' }}</button>
         <button :class="user.status === 'suspended' ? 'good' : 'danger'" :disabled="busy" @click="toggleSuspension">
           {{ user.status === 'suspended' ? 'Reinstate' : 'Suspend' }}
@@ -135,6 +136,8 @@ const toggleVerified = () => user.value && act(() => api.setVerified(props.exter
 
 <style scoped>
 .sub { margin: 2px 0 0; }
+.button { padding: 6px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.button:hover { border-color: var(--accent); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
 .stat { display: flex; flex-direction: column; padding: 10px 14px; }

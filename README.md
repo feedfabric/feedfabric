@@ -83,10 +83,10 @@ cp .env.example .env
 make models      # download the safety and embedding models (once)
 make up          # Postgres, Kafka, Redis, API and worker
 make backfill    # seed users and backfill 60 days of conversations (fresh database only), then stop
-make admin       # the admin panel at http://localhost:5180
+make admin       # the admin panel at http://localhost:5185
 ```
 
-Open **http://localhost:5180** for the dashboard: platform engagement, ranking experiments and safety. In Development any user can sign in to the panel; elsewhere it needs a staff role from your identity provider ([docs/auth.md](docs/auth.md)).
+Open **http://localhost:5185** for the dashboard: platform engagement, ranking experiments and safety. In Development any user can sign in to the panel; elsewhere it needs a staff role from your identity provider ([docs/auth.md](docs/auth.md)).
 
 After the simulator has run for a while, run `make train` to train the For You ranker. The API picks up the new model within a minute. On a Mac, LightGBM first needs `brew install libomp`.
 
@@ -100,7 +100,9 @@ After the simulator has run for a while, run `make train` to train the For You r
 | `make run` / `make run-worker` | Run the API or worker on your machine against Compose |
 | `make backfill` | Seed users and backfill demo history on a fresh database, on your machine at low priority, then stop |
 | `make simulate` / `make simulate-stop` | Start or stop the simulator in Docker (`Simulator__Live=true` keeps it posting after the backfill) |
-| `make admin` / `make admin-build` | Run the admin panel with hot reload at http://localhost:5180; build it as a static site into `web/admin/dist` |
+| `make admin` / `make admin-build` | Run the admin panel with hot reload at http://localhost:5185; build it as a static site into `web/admin/dist` |
+| `make docs` | The docs site at http://localhost:5186: how it all works, and a guide to building a front end on the API (`web/docs`) |
+| `make openapi` | Save the running API's OpenAPI document into the admin panel's API reference (`web/admin/public/openapi.json`) |
 | `make models` | Download the pretrained models into `.blobs/models` |
 | `make tune-toxicity` | Fine-tune the offensive-language model on this app's wording and publish it to `.blobs` (about 45 minutes) |
 | `make train` | Train the ranker on the feed log and publish it as ONNX |

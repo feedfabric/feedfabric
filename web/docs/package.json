@@ -1,0 +1,14 @@
+{
+  "name": "feedfabric-docs",
+  "private": true,
+  "type": "module",
+  "description": "FeedFabric's documentation site: how the system works, and how to build a front end on its API",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "5.18.2"
+  }
+}

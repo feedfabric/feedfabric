@@ -220,12 +220,20 @@ export interface ForYouFeed {
   candidates: number
 }
 
+export interface HomeFeed {
+  posts: HomeFeedPost[]
+  nextCursor: string | null
+  // Where the page came from: "redis", "postgres", or "redis+postgres" when it ran past the cached timeline
+  source: string
+}
+
 export interface HomeFeedPost {
   id: string
   authorExternalUserId: string
   authorUsername: string
   content: string
   createdAt: string
+  editedAt?: string | null
   tags: Tag[]
   media?: PostMedia[]
   ranking?: PostRanking | null

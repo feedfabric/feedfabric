@@ -4,7 +4,9 @@ import OverviewView from './views/OverviewView.vue'
 import PostView from './views/PostView.vue'
 import PostsView from './views/PostsView.vue'
 import ReportsView from './views/ReportsView.vue'
+import ApiView from './views/ApiView.vue'
 import ComposeView from './views/ComposeView.vue'
+import FeedView from './views/FeedView.vue'
 import ReviewView from './views/ReviewView.vue'
 import StudioView from './views/StudioView.vue'
 import SystemView from './views/SystemView.vue'
@@ -26,7 +28,10 @@ export const router = createRouter({
     { path: '/posts/:postId', name: 'post', component: PostView, props: true },
     // Ranking profiles: /studio opens the default one
     { path: '/studio/:key?', name: 'studio', component: StudioView },
+    // Someone's feeds as they see them: /feed shows yours
+    { path: '/feed/:externalUserId?', name: 'feed', component: FeedView, props: true },
     { path: '/system', name: 'system', component: SystemView },
+    { path: '/api', name: 'api', component: ApiView },
     { path: '/:pathMatch(.*)*', redirect: '/overview' },
   ],
   scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },

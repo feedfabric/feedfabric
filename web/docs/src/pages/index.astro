@@ -1,0 +1,91 @@
+---
+import Doc from '../layouts/Doc.astro'
+import Architecture from '../components/Architecture.astro'
+
+const headings = [
+  { depth: 2, slug: 'what-it-is', text: 'What it is' },
+  { depth: 2, slug: 'the-moving-parts', text: 'The moving parts' },
+  { depth: 2, slug: 'a-post-start-to-finish', text: 'A post, start to finish' },
+  { depth: 2, slug: 'reading-for-you', text: 'Reading For You' },
+  { depth: 2, slug: 'what-a-front-end-does', text: 'What a front end does' },
+  { depth: 2, slug: 'where-to-go-next', text: 'Where to go next' },
+]
+---
+
+<Doc title="FeedFabric" description="An open-source feed engine with ranking you can tune: timelines with fan-out, a learned For You ranker, ranking profiles, and content safety that runs on your own servers." headings={headings}>
+  <h2 id="what-it-is">What it is</h2>
+  <p>
+    FeedFabric is the back end of a social feed, written in C# on .NET 10. Members post, comment, like, repost and
+    follow; FeedFabric builds two feeds from that (<strong>Following</strong>, newest first from the people you follow,
+    and <strong>For You</strong>, ranked) and keeps both safe with checks on every post, comment and photo. It has no
+    accounts of its own: your identity provider signs people in, and FeedFabric trusts its tokens.
+  </p>
+  <p>
+    You bring the front end. These pages explain how each part works, then walk through building a member-facing UI on
+    the REST API: feeds with cursor paging, post cards, posting with photos, and the reading signals (impressions,
+    dwell, opens, <em>Not interested</em>) that the ranker learns from.
+  </p>
+
+  <h2 id="the-moving-parts">The moving parts</h2>
+  <Architecture />
+  <table>
+    <thead><tr><th>Part</th><th>Where</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>API</td><td><code>src/FeedFabric.Api</code></td><td>The REST API your app calls. Checks tokens, creates users on first sight, moderates text, serves and ranks feeds, records reading signals.</td></tr>
+      <tr><td>Application</td><td><code>src/FeedFabric.Application</code></td><td>The domain: EF Core entities, services, ranking, safety, storage. Shared by the API, worker and simulator.</td></tr>
+      <tr><td>Worker</td><td><code>src/FeedFabric.Worker.Events</code></td><td>Publishes the outbox to Kafka, then consumes it: fan-out to Redis timelines, engagement counters, photo checks, text embeddings.</td></tr>
+      <tr><td>Simulator</td><td><code>src/FeedFabric.Simulator</code></td><td>Seeds 1,000 users, backfills 14 days of conversations, then posts, reads and engages live, so there's something to rank.</td></tr>
+      <tr><td>Admin panel</td><td><code>web/admin</code></td><td>Vue 3 app for staff: dashboard, review queue, reports, users, posts, Feed studio, system settings.</td></tr>
+      <tr><td>FabricUI</td><td><code>web/fabric-ui</code></td><td>The Vue 3 components and design tokens the admin panel (and this site) are built with. Use them for your own front end.</td></tr>
+      <tr><td>ML</td><td><code>ml/</code></td><td>Python (uv): trains the For You ranker from the feed log, downloads and fine-tunes the safety models.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Stores: <strong>PostgreSQL 17</strong> is the source of truth (posts, users, follows, likes, the feed log, the
+    outbox). <strong>Redis 7.4</strong> holds what's fast and rebuildable: timelines, For You sessions, affinity and
+    topic scores, impression and dwell counters, embeddings. <strong>Kafka 4</strong> carries events between them.
+    <strong>Blob storage</strong> (a local folder in development, any S3-compatible service elsewhere) holds photos and
+    the models, which all run on CPU with ONNX Runtime.
+  </p>
+
+  <h2 id="a-post-start-to-finish">A post, start to finish</h2>
+  <ol class="flow">
+    <li><strong>Your app</strong><code>POST /userfeed/posts</code> with the member's token, and any photo IDs that passed their checks.</li>
+    <li><strong>Text checks</strong>Rules, then the toxicity model. A rule break or threat is refused (422); worse abuse is held; insults aimed at someone are flagged.</li>
+    <li><strong>One transaction</strong>The post, its tags and mentions, and a <code>PostCreated</code> outbox row are saved together.</li>
+    <li><strong>Outbox → Kafka</strong>The worker polls the outbox every half second and publishes to <code>feedfabric.posts</code>.</li>
+    <li><strong>Fan-out</strong>The worker adds the post ID to the author's and every follower's Redis timeline, newest 500 kept.</li>
+    <li><strong>Feeds</strong>Followers see it on their next Following page; For You can pick it as a candidate.</li>
+  </ol>
+  <p>Details: <a href="/how-it-works/posting/">Posting and safety</a> and <a href="/how-it-works/following/">Following and fan-out</a>.</p>
+
+  <h2 id="reading-for-you">Reading For You</h2>
+  <ol class="flow">
+    <li><strong>Candidates</strong>Up to four sources: who you follow, popular on your topics, liked by people like you, close in meaning to your likes. Plus your favourites.</li>
+    <li><strong>Filters</strong>Hidden posts, your own, old or held ones, and the profile's tag and media filters drop out.</li>
+    <li><strong>Score</strong>The trained model weighted by the profile's goals, the built-in formula, a custom formula, or newest first.</li>
+    <li><strong>Adjust</strong>Freshness, boosts (favourites, tags, authors) and a penalty for posts seen in the last day.</li>
+    <li><strong>Arrange</strong>Variety rules spread authors and topics, mix in accounts you don't follow and add exploration slots.</li>
+    <li><strong>Session</strong>The order is kept in Redis for 15 minutes; your app pages through it with an offset cursor.</li>
+  </ol>
+  <p>Every post served is logged with the signals it was scored on. What the reader does next (sees it, opens it, likes it, reads it for ten seconds, scrolls past) labels that row, and <code>ml/train_ranker.py</code> learns from those labels. Details: <a href="/how-it-works/for-you/">For You ranking</a> and <a href="/how-it-works/training/">Feed log and training</a>.</p>
+
+  <h2 id="what-a-front-end-does">What a front end does</h2>
+  <ul>
+    <li>Gets a token from your identity provider and sends it as <code>Authorization: Bearer</code>. In Development, <code>X-Dev-User: &lt;id&gt;</code> stands in.</li>
+    <li>Reads <code>GET /userfeed/home</code> and <code>GET /userfeed/foryou</code> a page at a time, passing back <code>nextCursor</code>.</li>
+    <li>Renders posts: reposts, held posts, tags, photos with short-lived URLs, and the ranking reasons on For You posts.</li>
+    <li>Likes, reposts, comments, follows and favourites with idempotent <code>PUT</code>/<code>DELETE</code> calls.</li>
+    <li>Uploads photos straight to blob storage through signed URLs, then posts once the worker has passed them.</li>
+    <li><strong>Reports what the member actually reads</strong>: impressions, dwell, opens, <em>Not interested</em> and <em>Show more</em>. Without these, For You has nothing to learn from.</li>
+    <li>Handles errors by their stable <code>code</code>, never by the English <code>detail</code>.</li>
+  </ul>
+
+  <h2 id="where-to-go-next">Where to go next</h2>
+  <div class="cards">
+    <a href="/running-locally/"><strong>Run it locally</strong><span>Docker, make targets, ports, the simulator and training a model.</span></a>
+    <a href="/how-it-works/for-you/"><strong>How For You ranks</strong><span>Candidates, scoring, variety, sessions and cursors.</span></a>
+    <a href="/build-a-ui/"><strong>Build a UI</strong><span>A Vue + FabricUI member app, step by step.</span></a>
+    <a href="/api/"><strong>API reference</strong><span>Every endpoint, its parameters and the errors it returns.</span></a>
+  </div>
+</Doc>

@@ -1,0 +1,99 @@
+---
+// The moving parts and how they talk, drawn with FabricUI's tokens so it reads in light and dark alike
+---
+
+<figure class="figure arch">
+  <div class="scroll">
+    <svg viewBox="0 0 1000 560" role="img" aria-labelledby="arch-title arch-desc">
+      <title id="arch-title">FeedFabric's architecture</title>
+      <desc id="arch-desc">
+        Your identity provider issues tokens to your app and the admin panel, which call FeedFabric.Api over REST. The
+        API reads and writes Redis, PostgreSQL and blob storage. FeedFabric.Worker.Events publishes the Postgres outbox
+        to Kafka, consumes it, and updates Redis timelines, scans photos with ClamAV and writes blobs. The ml folder
+        trains the ranker from the feed log in Postgres and publishes ONNX models to blob storage. The simulator uses
+        the same services against the same Postgres and Redis.
+      </desc>
+      <defs>
+        <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0L10 5L0 10z" class="head" />
+        </marker>
+      </defs>
+
+      <!-- Callers -->
+      <g class="box"><rect x="20" y="20" width="210" height="70" rx="10" /><text x="125" y="50">Identity provider</text><text x="125" y="72" class="sub">Auth0, Entra ID, Keycloak…</text></g>
+      <g class="box you"><rect x="20" y="150" width="210" height="80" rx="10" /><text x="125" y="182">Your app</text><text x="125" y="206" class="sub">your member UI</text></g>
+      <g class="box"><rect x="20" y="270" width="210" height="70" rx="10" /><text x="125" y="300">Admin panel</text><text x="125" y="322" class="sub">web/admin · staff only</text></g>
+      <g class="box dashed"><rect x="20" y="400" width="210" height="80" rx="10" /><text x="125" y="432">Simulator</text><text x="125" y="454" class="sub">1,000 simulated members</text></g>
+
+      <!-- FeedFabric -->
+      <g class="box"><rect x="300" y="20" width="260" height="70" rx="10" /><text x="430" y="50">ml/train_ranker.py</text><text x="430" y="72" class="sub">LightGBM → ONNX</text></g>
+      <g class="box core">
+        <rect x="300" y="150" width="260" height="190" rx="12" />
+        <text x="430" y="182">FeedFabric.Api</text>
+        <text x="430" y="208" class="sub">/userfeed /follows</text>
+        <text x="430" y="228" class="sub">/favourites /media</text>
+        <text x="430" y="248" class="sub">/admin /ranking (staff)</text>
+        <text x="430" y="278" class="sub">text moderation</text>
+        <text x="430" y="298" class="sub">For You ranking</text>
+        <text x="430" y="318" class="sub">feed log and signals</text>
+      </g>
+      <g class="box core">
+        <rect x="300" y="390" width="260" height="140" rx="12" />
+        <text x="430" y="422">FeedFabric.Worker.Events</text>
+        <text x="430" y="450" class="sub">outbox → Kafka</text>
+        <text x="430" y="472" class="sub">fan-out · engagement</text>
+        <text x="430" y="494" class="sub">photo checks · embeddings</text>
+      </g>
+
+      <!-- State and infrastructure -->
+      <g class="group"><rect x="640" y="20" width="340" height="520" rx="14" /><text x="660" y="46">State and infrastructure</text></g>
+      <g class="box store"><rect x="660" y="62" width="300" height="62" rx="9" /><text x="810" y="88">Redis</text><text x="810" y="109" class="sub">timelines, For You sessions, signals</text></g>
+      <g class="box store"><rect x="660" y="140" width="300" height="62" rx="9" /><text x="810" y="166">PostgreSQL</text><text x="810" y="187" class="sub">posts, users, FeedLog, outbox</text></g>
+      <g class="box store"><rect x="660" y="218" width="300" height="62" rx="9" /><text x="810" y="244">Blob storage</text><text x="810" y="265" class="sub">photos and ONNX models (disk or S3)</text></g>
+      <g class="box store"><rect x="660" y="380" width="300" height="62" rx="9" /><text x="810" y="406">Kafka</text><text x="810" y="427" class="sub">posts · engagement · media topics</text></g>
+      <g class="box store"><rect x="660" y="458" width="300" height="62" rx="9" /><text x="810" y="484">ClamAV</text><text x="810" y="505" class="sub">malware scan (switchable)</text></g>
+
+      <!-- Arrows -->
+      <g class="line">
+        <path d="M125 90V150" marker-end="url(#arch-arrow)" />
+        <path d="M230 190H300" marker-end="url(#arch-arrow)" />
+        <path d="M230 305H300" marker-end="url(#arch-arrow)" />
+        <path d="M560 245H640" marker-start="url(#arch-arrow)" marker-end="url(#arch-arrow)" />
+        <path d="M560 460H640" marker-start="url(#arch-arrow)" marker-end="url(#arch-arrow)" />
+        <path d="M560 55H640" marker-start="url(#arch-arrow)" marker-end="url(#arch-arrow)" />
+        <path d="M125 480V550H810V542" class="dashed" marker-end="url(#arch-arrow)" />
+      </g>
+      <g class="label">
+        <text x="135" y="124" text-anchor="start">token</text>
+        <text x="265" y="182">REST</text>
+        <text x="265" y="297">REST</text>
+        <text x="600" y="234">reads,</text><text x="600" y="266">writes</text>
+        <text x="600" y="452">consumes</text>
+        <text x="600" y="44">FeedLog</text><text x="600" y="76">ONNX</text>
+        <text x="470" y="554">same services, same Postgres and Redis</text>
+      </g>
+    </svg>
+  </div>
+  <p class="hint" aria-hidden="true">Scroll sideways to see the whole diagram.</p>
+  <figcaption>
+    Your app only ever talks to the API. Everything slow or fan-shaped (timelines, counters, photo checks, embeddings)
+    happens in the worker, driven by events the API writes to Postgres in the same transaction as the change.
+  </figcaption>
+</figure>
+
+<style>
+  .arch svg { display: block; width: 100%; min-width: 680px; height: auto; font-family: var(--fabric-font); }
+  .arch .box rect { fill: var(--fabric-surface-raised); stroke: var(--fabric-line-strong); stroke-width: 1.5; }
+  .arch .box.you rect { fill: var(--fabric-good-soft); stroke: var(--fabric-good); }
+  .arch .box.core rect { fill: var(--fabric-accent-soft); stroke: var(--fabric-accent); }
+  .arch .box.store rect { fill: var(--fabric-surface); }
+  .arch .box.dashed rect { stroke-dasharray: 6 5; }
+  .arch .box text { fill: var(--fabric-ink); font-size: 18px; font-weight: 650; text-anchor: middle; }
+  .arch .box text.sub { fill: var(--fabric-muted); font-size: 15px; font-weight: 450; }
+  .arch .group rect { fill: var(--fabric-sunken); stroke: var(--fabric-line); stroke-width: 1.5; }
+  .arch .group text { fill: var(--fabric-muted); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .arch .line path { fill: none; stroke: var(--fabric-muted); stroke-width: 1.6; }
+  .arch .line path.dashed { stroke-dasharray: 5 5; }
+  .arch .head { fill: var(--fabric-muted); }
+  .arch .label text { fill: var(--fabric-muted); font-size: 14px; text-anchor: middle; paint-order: stroke; stroke: var(--fabric-surface); stroke-width: 4px; }
+</style>
