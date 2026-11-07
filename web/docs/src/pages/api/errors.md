@@ -24,6 +24,8 @@ description: Every error is RFC 9457 Problem Details with a stable code. The cod
 - **`detail`** is English for developers and logs. Don't show it to members or match on it.
 - **`traceId`** is what the server's logs are keyed on; quote it when reporting a `500`.
 
+A `429` or `503` is temporary: wait for `Retry-After` and try again, and tell the member only if it keeps happening.
+
 New codes may be added, so always fall back to a generic message for one you don't recognise. The codes are defined
 in `src/FeedFabric.Application/Errors/ErrorCodes.cs`; the repository's `docs/errors.md` is the canonical list.
 
@@ -62,7 +64,10 @@ in `src/FeedFabric.Application/Errors/ErrorCodes.cs`; the repository's `docs/err
 | `method_not_allowed` | 405 | | | |
 | `conflict` | 409 | | Generic fallback | |
 | `unsupported_media_type` | 415 | | Send `Content-Type: application/json` | Routes with a body |
+| `request_too_large` | 413 | | The body is over 1 MB (`Kestrel:Limits:MaxRequestBodySize`) | Routes with a body |
+| `rate_limited` | 429 | `retryAfterSeconds` | Too many requests of one kind; wait that long (also in `Retry-After`) | Writes, signals, `/ranking/preview`, `/me/export`, `DELETE /me` |
 | `internal_error` | 500 | | Unexpected server error, including a safety model that couldn't run; quote `traceId` | Any |
+| `service_unavailable` | 503 | `retryAfterSeconds` | Postgres, Valkey or blob storage can't be reached for now; try again after `Retry-After` | Any route that needs one |
 
 ## Validation errors
 
@@ -83,6 +88,7 @@ in `src/FeedFabric.Application/Errors/ErrorCodes.cs`; the repository's `docs/err
 |---|---|---|
 | `required` | | Missing or blank |
 | `out_of_range` | `min`, `max` | Outside the allowed range (also too many items: `max` only) |
+| `too_long` | `max` | More characters than allowed: 5,000 for a post, 2,000 for a comment |
 | `invalid_value` | | Wrong format or type, or not one of the allowed values (a malformed ID, an unknown report reason) |
 
 ## Not Problem Details

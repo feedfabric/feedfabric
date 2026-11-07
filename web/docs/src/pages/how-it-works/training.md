@@ -70,7 +70,10 @@ gets five labels, one LightGBM classifier each (a "head"):
 | `synthetic` | The simulator's `sim-*` members | Experiments |
 | `all` | Everyone | Development (`make train`) |
 
-The admin dashboard labels a model trained on synthetic data, and it shouldn't be served to real members.
+A model trained on synthetic data is refused outside Development (unless `Ranking:AllowSimulatedRanker` is on), so
+real members never get one: For You ranks by its formula instead. The trainer also writes each file's SHA-256 to
+`latest.json`, and a file that doesn't match is refused. The feed log itself is kept for 180 days
+(`Retention:FeedLog`).
 
 <div class="warn">
 

@@ -16,7 +16,7 @@ description: Docker for the infrastructure, the .NET services, the simulator for
 ```bash
 cp .env.example .env
 make models      # download the safety and embedding models into .blobs (once)
-make up          # Postgres, Kafka, Redis, ClamAV, API and worker in Docker
+make up          # Postgres, Kafka, Valkey, ClamAV, API and worker in Docker
 make simulate    # seed users, backfill 14 days of conversations, then run live
 make admin       # the admin panel at http://localhost:5185
 ```
@@ -63,7 +63,7 @@ this in one go.
 | 5173, 5174 | Taken by the old simulator UIs; keep new dev servers off them |
 | 5432 | PostgreSQL (`POSTGRES_PORT` in `.env`) |
 | 9092 | Kafka from the host (containers use `kafka:29092`) |
-| 6379 | Redis |
+| 6379 | Valkey (Redis-compatible) |
 | 3310 | ClamAV |
 | 4566 | LocalStack S3, only with `docker compose --profile s3 up -d localstack` |
 

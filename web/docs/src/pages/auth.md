@@ -11,6 +11,8 @@ description: FeedFabric has no accounts. Your identity provider signs people in;
 - Every call sends it: `Authorization: Bearer <token>`. Every route except the signed blob links needs one;
   a missing or bad token is `401 unauthorized`.
 - FeedFabric checks the token, then reads the user's ID, name, avatar and roles from its claims (`IdentityClaims`).
+  Claims in the token whose type starts with `ff:` are dropped first: those are FeedFabric's own, so a token can't
+  grant itself a role by carrying them.
 - **On the first request** the `UserProvisioning` middleware creates the user from the token; later tokens refresh the
   username, display name and avatar at most once an hour (`Auth:ProfileRefresh`).
 

@@ -42,7 +42,8 @@ Reposts are posts, so they fan out the same way. Held posts fan out too; reading
 <div class="note">
 
 **Following someone doesn't backfill.** `PUT /follows/{externalUserId}` adds the follow; their earlier posts don't
-enter your Redis timeline, only what they post from then on. Unfollowing doesn't remove what's already there either;
+enter your Redis timeline, only what they post from then on. They do show further down, once you page past the end of
+the timeline and Postgres carries on. Unfollowing doesn't remove what's already there either;
 those entries age out as newer posts push them past 500.
 
 </div>
@@ -77,7 +78,9 @@ read: your own posts and those of everyone you follow, by ID, which for UUIDv7 I
 - Redis is down or errors,
 - the member has no timeline yet (a new member, or Redis was flushed),
 - the cursor isn't in the timeline (trimmed away, or it came from a Postgres page),
-- or a page runs past the 500 entries Redis keeps, in which case it continues from Postgres (`redis+postgres`).
+- or a page runs past the end of the timeline, in which case it continues from Postgres (`redis+postgres`). That
+  covers the 500 entries Redis keeps, and a timeline that fan-out started again after Redis lost the old one, which
+  holds only the posts since.
 
 Both are newest first and page the same way, so a client never needs to know which one it got.
 

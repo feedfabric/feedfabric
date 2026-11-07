@@ -33,8 +33,9 @@ for.
    data, comments and anything appended are gone. PNG is kept only where transparency matters; the rest become JPEG.
 5. **Nudity**: scores the rebuilt image; at or above `Moderation:NudityRejectAt` (0.8) it's rejected and logged.
 
-Like the text checks, it **fails closed**: if ClamAV or the nudity model can't answer, the handler throws, Kafka
-redelivers, and the photo stays in quarantine (`processing`) until it can. Rejected uploads are deleted; the reason
+Like the text checks, it **fails closed**: if ClamAV or the nudity model can't answer (the worker retries a refused
+connection twice first), the handler throws, Kafka redelivers, and the photo stays in quarantine (`processing`) until
+it can. Rejected uploads are deleted; the reason
 on the row is the record.
 
 ## Statuses and reasons

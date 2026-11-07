@@ -14,7 +14,13 @@ description: Every route the API serves, grouped by what it's for, with the para
 - **JSON** in and out, camelCase, `Content-Type: application/json` on bodies (`415 unsupported_media_type`
   otherwise). IDs are UUID strings; times are ISO 8601 UTC.
 - **Paging**: `limit` (1–100, default 20) and `cursor`, the previous page's `nextCursor`; `null` means the end.
-- **Every write** by a suspended member is `403 user.suspended`, except the reading signals.
+- **Every write** by a suspended member is `403 user.suspended`, except the reading signals and deleting their own
+  account.
+- **Rate limits**: posting, commenting, reactions, reports, uploads, signals, ranking previews and the account routes
+  are limited per member. Over a limit is `429 rate_limited` with `Retry-After`.
+- **Bodies** over 1 MB are `413 request_too_large`. Photos don't count: they go straight to blob storage.
+- **A dependency down**: when Postgres, Valkey or blob storage can't be reached, a route that needs it answers
+  `503 service_unavailable` with `Retry-After`. The Following feed reads Postgres instead.
 - **Every member route** can return `404 user.not_synced` if the caller's user doesn't exist (only when
   `Auth:ProvisionUsers` is off, or a first-request race), and `400 validation_failed` for a malformed ID, body or
   out-of-range parameter. These aren't repeated below.
@@ -141,6 +147,7 @@ See [Ranking profiles](/how-it-works/profiles/).
 | <span class="m">GET</span> | `/admin/users/{externalUserId}` | A user for staff | `404 user.not_found` |
 | <span class="m put">PUT</span> | `/admin/users/{externalUserId}/status` | `{ "status": "suspended" \| "active" }`, recorded in the log | `404 user.not_found` |
 | <span class="m put">PUT</span> | `/admin/users/{externalUserId}/verified` | `{ "verified": true }` | `404 user.not_found` |
+| <span class="m delete">DELETE</span> | `/admin/users/{externalUserId}` | Erase an account, as `DELETE /me` does, for a request made another way: `202` | `404 user.not_found` |
 | <span class="m">GET</span> | `/admin/posts?q=&author=&status=&reported=&offset=&limit=` | Posts in every state; `status` `visible`, `held`, `removed` or `deleted` | |
 | <span class="m">GET</span> | `/admin/posts/{id}` | A post with its comments, reports and moderation history | `404 post.not_found` |
 | <span class="m">GET</span> | `/admin/media/{id}` | An upload with its nudity score and the line it's judged against | `404 media.not_found` |
@@ -160,4 +167,7 @@ See [Ranking profiles](/how-it-works/profiles/).
 | | Route | Purpose |
 |---|---|---|
 | <span class="m">GET</span> | `/me` | The caller's `externalUserId`; a quick token check |
+| <span class="m">GET</span> | `/me/export` | Everything held about the caller, as one JSON download (subject access); 5 an hour |
+| <span class="m delete">DELETE</span> | `/me` | Erase the caller's account: `202`. Posts, comments and the profile go at once, the rest within minutes |
+| <span class="m">GET</span> | `/health/live`, `/health/ready` | For probes, no token: up, and able to serve (Postgres and the toxicity model) |
 | <span class="m">GET</span> | `/openapi/v1.json` | The OpenAPI document, Development only |
