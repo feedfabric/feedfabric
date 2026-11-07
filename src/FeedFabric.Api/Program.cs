@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
 using FeedFabric.Api.Admin;
@@ -12,6 +13,7 @@ using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Feed;
+using FeedFabric.Application.Services.Health;
 using FeedFabric.Application.Services.Impressions;
 using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Follows;
@@ -28,7 +30,14 @@ using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using FeedFabric.Application.Services.Tags;
 using FeedFabric.Application.Services.Users;
+using FeedFabric.Hosting;
 using StackExchange.Redis;
+
+// Docker HEALTHCHECK: see HealthEndpoints.ProbeAsync
+if (args is ["healthcheck", ..])
+{
+    return await HealthEndpoints.ProbeAsync();
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -96,6 +105,12 @@ builder.Services.AddFeedFabricAuth(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment).AddModerationPolicies(builder.Environment)
     .AddAdminPolicies(builder.Environment);
 builder.Services.AddHttpContextAccessor();
+// /health/live and /health/ready. Without Redis the API still serves (feeds fall back to Postgres), so it only
+// degrades readiness; without the toxicity model nothing can be posted.
+builder.Services.AddHealthChecks()
+    .AddPostgres()
+    .AddRedis(HealthStatus.Degraded)
+    .AddModels(HealthStatus.Unhealthy, ToxicityClassifier.Prefix);
 // Per-user limits on writes, signals and previews (RateLimitOptions)
 builder.Services.AddFeedFabricRateLimiting(builder.Configuration);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
@@ -155,6 +170,7 @@ app.UseMiddleware<UserProvisioning>();
 app.UseMiddleware<SuspendedUsers>();
 
 app.MapControllers();
+app.MapFeedFabricHealth();
 
 if (app.Services.GetService<LocalBlobStorage>() is not null)
 {
@@ -164,5 +180,6 @@ if (app.Services.GetService<LocalBlobStorage>() is not null)
 app.MapGet("/me", (ICurrentUser currentUser) => new { currentUser.ExternalUserId })
     .RequireAuthorization();
 
-app.Run();
+await app.RunAsync();
+return 0;
 public partial class Program;

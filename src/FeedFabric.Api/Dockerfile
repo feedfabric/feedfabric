@@ -24,4 +24,6 @@ RUN dotnet publish "FeedFabric.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publi
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# The images have no curl, so the app checks its own /health/live
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["dotnet", "FeedFabric.Api.dll", "healthcheck"]
 ENTRYPOINT ["dotnet", "FeedFabric.Api.dll"]

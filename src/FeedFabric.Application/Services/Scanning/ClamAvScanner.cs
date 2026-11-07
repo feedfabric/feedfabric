@@ -55,6 +55,25 @@ public class ClamAvScanner(IOptions<MalwareScanningOptions> options) : IMalwareS
         throw new MalwareScanException($"clamd didn't give a verdict: {reply}");
     }
 
+    public async Task<bool> PingAsync(CancellationToken cancellationToken)
+    {
+        var settings = options.Value.ClamAv;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(settings.Host, settings.Port, timeout.Token);
+            await using var network = client.GetStream();
+            await network.WriteAsync("zPING\0"u8.ToArray(), timeout.Token);
+            return await ReadReplyAsync(network, timeout.Token) == "PONG";
+        }
+        catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     private static async Task<string> ReadReplyAsync(NetworkStream network, CancellationToken cancellationToken)
     {
         var reply = new MemoryStream();

@@ -11,7 +11,8 @@ namespace FeedFabric.Application.Services.Safety;
 // Without the model it throws rather than guessing: a photo that couldn't be checked is never published.
 public sealed class NudityClassifier(IBlobStorage storage) : IDisposable
 {
-    private const string Prefix = "models/safety/nsfw";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/safety/nsfw";
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
     private Meta? meta;

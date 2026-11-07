@@ -13,7 +13,8 @@ namespace FeedFabric.Application.Services.Safety;
 // It reads meaning rather than words, so it catches abuse a word list misses: misspellings, "y0u", insults with no slur.
 public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
 {
-    private const string Prefix = "models/safety/toxicity";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/safety/toxicity";
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
     private CodeGenTokenizer? tokenizer;

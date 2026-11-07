@@ -1,7 +1,9 @@
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Feed;
+using FeedFabric.Application.Services.Health;
 using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Messaging;
@@ -14,9 +16,17 @@ using FeedFabric.Worker.Events.Embeddings;
 using FeedFabric.Worker.Events.Kafka;
 using FeedFabric.Worker.Events.Media;
 using FeedFabric.Worker.Events.Outbox;
+using FeedFabric.Hosting;
 using StackExchange.Redis;
 
-var builder = Host.CreateApplicationBuilder(args);
+// Docker HEALTHCHECK: see HealthEndpoints.ProbeAsync
+if (args is ["healthcheck", ..])
+{
+    return await HealthEndpoints.ProbeAsync();
+}
+
+// A web host only to serve /health/live and /health/ready (port 8080 in the container); the work is the hosted services
+var builder = WebApplication.CreateSlimBuilder(args);
 
 // Pooled: each event gets its own scope, and so a context, which is reset and reused rather than built again
 builder.Services.AddDbContextPool<AppDbContext>(options =>
@@ -41,8 +51,13 @@ builder.Services.AddSingleton(_ =>
     return new ProducerBuilder<string, string>(config).Build();
 });
 
+// abortConnect=false: start even if Redis is down, and reconnect when it's back; handlers retry until then
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
-    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379"));
+{
+    var redisOptions = ConfigurationOptions.Parse(builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379");
+    redisOptions.AbortOnConnectFail = false;
+    return ConnectionMultiplexer.Connect(redisOptions);
+});
 
 builder.Services.AddScoped<FeedFanOutHandler>();
 builder.Services.AddScoped<LikeHandler>();
@@ -56,6 +71,15 @@ builder.Services.AddSingleton<NudityClassifier>();
 builder.Services.AddSingleton<TextEmbedder>();
 builder.Services.AddScoped<EmbeddingStore>();
 builder.Services.AddScoped<PostEmbeddingHandler>();
+// The worker can't do its job without any of these, so each makes it unready
+builder.Services.AddSingleton<KafkaHealthCheck>();
+builder.Services.AddHealthChecks()
+    .AddPostgres()
+    .AddRedis(HealthStatus.Unhealthy)
+    .AddClamAv()
+    .AddCheck<KafkaHealthCheck>("kafka", HealthStatus.Unhealthy, [HealthTags.Ready])
+    .AddModels(HealthStatus.Unhealthy, NudityClassifier.Prefix, TextEmbedder.Prefix);
+
 builder.Services.AddHostedService<OutboxPublisher>();
 builder.Services.AddHostedService<PostEventsConsumer>();
 builder.Services.AddHostedService<EngagementEventsConsumer>();
@@ -78,5 +102,8 @@ if (!host.Services.GetRequiredService<IOptions<MalwareScanningOptions>>().Value.
         .LogWarning("Malware scanning is off (MalwareScanning:Enabled=false): uploads are published without a ClamAV scan");
 }
 
+host.MapFeedFabricHealth();
+
 await KafkaTopics.EnsureCreatedAsync(kafkaOptions);
 await host.RunAsync();
+return 0;

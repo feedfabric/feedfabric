@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Shared\HealthEndpoints.cs" Link="Shared\HealthEndpoints.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FeedFabric.Application\FeedFabric.Application.csproj" />
   </ItemGroup>
 

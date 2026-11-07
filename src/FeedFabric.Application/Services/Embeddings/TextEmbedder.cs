@@ -13,7 +13,8 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
 {
     public const int Dimensions = 384;
     private const int MaxTokens = 128;
-    private const string Prefix = "models/embeddings/minilm";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/embeddings/minilm";
 
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
