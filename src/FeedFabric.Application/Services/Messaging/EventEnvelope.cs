@@ -23,6 +23,12 @@ public class EventEnvelope<T>
 
     public required string CorrelationId { get; set; }
 
+    // W3C trace context of the request that caused it; the outbox publisher copies it into the Kafka headers so the
+    // worker's spans join the request's trace
+    public string? TraceParent { get; set; }
+
+    public string? TraceState { get; set; }
+
     public required T Data { get; set; }
 }
 

@@ -27,6 +27,15 @@ public partial class TextModerator(IOptions<ModerationOptions> options, Toxicity
     // rules). Blocking wins over holding, holding over flagging.
     public async Task<ModerationVerdict?> CheckAsync(string text, CancellationToken cancellationToken)
     {
+        var verdict = await VerdictAsync(text, cancellationToken);
+        AppMetrics.ModerationChecks.Add(1,
+            new KeyValuePair<string, object?>("outcome", verdict?.Action.ToString().ToLowerInvariant() ?? "allowed"),
+            new KeyValuePair<string, object?>("category", verdict?.Category));
+        return verdict;
+    }
+
+    private async Task<ModerationVerdict?> VerdictAsync(string text, CancellationToken cancellationToken)
+    {
         if (CheckRules(text) is { } rule)
         {
             return new ModerationVerdict(ModerationAction.Block, rule, 1);

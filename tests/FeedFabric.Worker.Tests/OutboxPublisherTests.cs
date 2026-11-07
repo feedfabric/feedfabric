@@ -61,4 +61,34 @@ public class OutboxPublisherTests(WorkerFixture fixture)
         Assert.Equal(2, b.Attempts);
         Assert.NotNull(g.ProcessedAt);
     }
+
+    [Fact]
+    public async Task The_request_trace_context_goes_into_the_kafka_headers()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string traceParent = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
+        var key = $"trace-{Guid.NewGuid()}";
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.OutboxMessages.ExecuteDeleteAsync(cancellationToken);
+            db.OutboxMessages.Add(new OutboxMessageEntity
+            {
+                Type = EventTypes.MediaUploaded,
+                Payload = $$$"""{"traceParent":"{{{traceParent}}}","data":{}}""",
+                PartitionKey = key,
+                CreatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        var publisher = new OutboxPublisher(fixture.Services.GetRequiredService<IServiceScopeFactory>(), fixture.Producer,
+            Options.Create(new OutboxOptions()), TimeProvider.System, WorkerFixture.Logger<OutboxPublisher>());
+
+        await publisher.PublishBatchAsync(cancellationToken);
+
+        var published = fixture.ReadAll(Topics.Media, 50, TimeSpan.FromSeconds(10)).Single(m => m.Message.Key == key);
+        var header = System.Text.Encoding.UTF8.GetString(published.Message.Headers.GetLastBytes("traceparent"));
+        // Same trace; the span is the publish's own when tracing is on
+        Assert.Equal(traceParent.Split('-')[1], header.Split('-')[1]);
+    }
 }

@@ -12,6 +12,7 @@ using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using FeedFabric.Worker.Engagement;
+using FeedFabric.Worker.Events;
 using FeedFabric.Worker.Events.FanOut;
 using FeedFabric.Worker.Events.Embeddings;
 using FeedFabric.Worker.Events.Kafka;
@@ -29,6 +30,7 @@ if (args is ["healthcheck", ..])
 // A web host only to serve /health/live and /health/ready (port 8080 in the container); the work is the hosted services
 var builder = WebApplication.CreateSlimBuilder(args);
 StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis", "Kafka:BootstrapServers");
+builder.AddFeedFabricTelemetry("feedfabric-worker", [WorkerMetrics.Name], [WorkerMetrics.Name]);
 
 // Pooled: each event gets its own scope, and so a context, which is reset and reused rather than built again
 builder.Services.AddDbContextPool<AppDbContext>(options =>

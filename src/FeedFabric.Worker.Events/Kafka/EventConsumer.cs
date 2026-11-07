@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -64,6 +65,13 @@ public abstract class EventConsumer(
 
                 await HandleWithRetryAsync(result, stoppingToken);
                 consumer.Commit(result);
+                WorkerMetrics.EventsHandled.Add(1, new KeyValuePair<string, object?>("topic", Topic), new KeyValuePair<string, object?>("group", GroupId));
+                // From what the consumer already knows of the partition's end, so no broker round trip
+                var watermarks = consumer.GetWatermarkOffsets(result.TopicPartition);
+                if (watermarks.High != Offset.Unset)
+                {
+                    WorkerMetrics.RecordConsumerLag(GroupId, Topic, result.Partition.Value, watermarks.High.Value - result.Offset.Value - 1);
+                }
             }
         }
         catch (OperationCanceledException)
@@ -81,6 +89,14 @@ public abstract class EventConsumer(
     {
         var message = result.Message;
         var type = message.Headers.TryGetLastBytes(KafkaHeaders.Type, out var typeBytes) ? Encoding.UTF8.GetString(typeBytes) : null;
+        // A child of the request that wrote the event, when it carried trace context
+        ActivityContext.TryParse(Header(message, KafkaHeaders.TraceParent), Header(message, KafkaHeaders.TraceState), out var parent);
+        using var activity = WorkerMetrics.Source.StartActivity($"{Topic} process", ActivityKind.Consumer, parent);
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination.name", Topic);
+        activity?.SetTag("messaging.consumer.group.name", GroupId);
+        activity?.SetTag("messaging.kafka.message.key", message.Key);
+        activity?.SetTag("feedfabric.event.type", type);
         var failures = 0;
         for (var attempt = 1; ; attempt++)
         {
@@ -93,6 +109,7 @@ public abstract class EventConsumer(
             catch (JsonException ex)
             {
                 // Retrying can't fix a payload that doesn't parse
+                activity?.SetStatus(ActivityStatusCode.Error, "dead-lettered");
                 await DeadLetterAsync(result, type, ex, attempt, cancellationToken);
                 return;
             }
@@ -101,6 +118,7 @@ public abstract class EventConsumer(
                 var transient = TransientFailures.IsTransient(ex);
                 if (!transient && ++failures >= options.MaxHandlerAttempts)
                 {
+                    activity?.SetStatus(ActivityStatusCode.Error, "dead-lettered");
                     await DeadLetterAsync(result, type, ex, attempt, cancellationToken);
                     return;
                 }
@@ -155,6 +173,9 @@ public abstract class EventConsumer(
         logger.LogCritical(error, "Dead-lettered {Type} event with key {Key} from {Topic} [{Partition}] @{Offset} to {DeadLetterTopic} after {Attempts} attempts",
             type, result.Message.Key, result.Topic, result.Partition.Value, result.Offset.Value, topic, attempts);
     }
+
+    private static string? Header(Message<string, string> message, string key) =>
+        message.Headers.TryGetLastBytes(key, out var bytes) ? Encoding.UTF8.GetString(bytes) : null;
 
     private static void Add(Headers headers, string key, string value) => headers.Add(key, Encoding.UTF8.GetBytes(value));
 }

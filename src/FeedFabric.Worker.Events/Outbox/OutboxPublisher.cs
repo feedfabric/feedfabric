@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -24,6 +26,7 @@ public class OutboxPublisher(
     ILogger<OutboxPublisher> logger) : BackgroundService
 {
     private const int BatchSize = 100;
+    private DateTimeOffset lagRecordedAt = DateTimeOffset.MinValue;
     private static readonly TimeSpan IdleDelay = TimeSpan.FromMilliseconds(500);
 
     // pg_try_advisory_xact_lock key: any constant no other code uses
@@ -69,6 +72,7 @@ public class OutboxPublisher(
         var messages = await db.OutboxMessages
             .FromSql($"""SELECT * FROM "OutboxMessages" WHERE "ProcessedAt" IS NULL AND "Attempts" < {maxAttempts} ORDER BY "CreatedAt", "Id" LIMIT {BatchSize} FOR UPDATE""")
             .ToListAsync(cancellationToken);
+        await RecordLagAsync(db, maxAttempts, cancellationToken);
         if (messages.Count == 0)
         {
             return 0;
@@ -82,6 +86,20 @@ public class OutboxPublisher(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return messages.Count;
+    }
+
+    // The outbox gauges (WorkerMetrics), read at most every 15 seconds
+    private async Task RecordLagAsync(AppDbContext db, int maxAttempts, CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow();
+        if (now - lagRecordedAt < TimeSpan.FromSeconds(15))
+        {
+            return;
+        }
+        lagRecordedAt = now;
+        var waiting = await db.OutboxMessages.Waiting(maxAttempts).CountAsync(cancellationToken);
+        var oldest = await db.OutboxMessages.Waiting(maxAttempts).MinAsync(o => (DateTime?)o.CreatedAt, cancellationToken);
+        WorkerMetrics.RecordOutbox(waiting, oldest is null ? TimeSpan.Zero : now.UtcDateTime - oldest.Value);
     }
 
     private async Task PublishInOrderAsync(List<OutboxMessageEntity> messages, DateTime now, int maxAttempts, CancellationToken cancellationToken)
@@ -119,11 +137,45 @@ public class OutboxPublisher(
     {
         // Inside the async method, so an unknown type faults this message's task instead of the whole batch
         var topic = Topics.ForEventType(message.Type);
+        var headers = new Headers { { KafkaHeaders.Type, Encoding.UTF8.GetBytes(message.Type) } };
+
+        // The publish joins the trace of the request that wrote the event, and passes it on to the consumers
+        var (traceParent, traceState) = TraceContext(message.Payload);
+        ActivityContext.TryParse(traceParent, traceState, out var parent);
+        using var activity = WorkerMetrics.Source.StartActivity($"{topic} publish", ActivityKind.Producer, parent);
+        activity?.SetTag("messaging.system", "kafka");
+        activity?.SetTag("messaging.destination.name", topic);
+        activity?.SetTag("feedfabric.event.type", message.Type);
+        if ((activity?.Id ?? traceParent) is { } id)
+        {
+            headers.Add(KafkaHeaders.TraceParent, Encoding.UTF8.GetBytes(id));
+            if ((activity?.TraceStateString ?? traceState) is { Length: > 0 } state)
+            {
+                headers.Add(KafkaHeaders.TraceState, Encoding.UTF8.GetBytes(state));
+            }
+        }
+
         await producer.ProduceAsync(topic, new Message<string, string>
         {
             Key = message.PartitionKey,
             Value = message.Payload,
-            Headers = new Headers { { KafkaHeaders.Type, Encoding.UTF8.GetBytes(message.Type) } },
+            Headers = headers,
         }, cancellationToken);
+    }
+
+    // EventEnvelope's traceParent and traceState, without deserializing Data
+    private static (string? TraceParent, string? TraceState) TraceContext(string payload)
+    {
+        try
+        {
+            using var envelope = JsonDocument.Parse(payload);
+            var root = envelope.RootElement;
+            return (root.TryGetProperty("traceParent", out var parent) ? parent.GetString() : null,
+                root.TryGetProperty("traceState", out var state) ? state.GetString() : null);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
     }
 }

@@ -25,6 +25,8 @@ public static class OutboxExtensions
             OccurredAt = occurredAt,
             ActorId = actorId,
             CorrelationId = Activity.Current?.TraceId.ToString() ?? message.Id.ToString(),
+            TraceParent = Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity ? activity.Id : null,
+            TraceState = Activity.Current?.TraceStateString,
             Data = data,
         }, EventJson.Options);
     }

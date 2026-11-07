@@ -44,6 +44,7 @@ if (args is ["healthcheck", ..])
 
 var builder = WebApplication.CreateBuilder(args);
 StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis");
+builder.AddFeedFabricTelemetry("feedfabric-api", [], []);
 
 // Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
 builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
