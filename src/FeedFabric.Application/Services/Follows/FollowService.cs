@@ -42,15 +42,15 @@ public class FollowService(AppDbContext db, TimeProvider timeProvider) : IFollow
         var (followerId, followeeId) = await db.Users.FindPairAsync(externalUserId, targetExternalUserId, cancellationToken);
         if (followerId is null)
         {
-            return (FollowResultStatus.UserNotFound, default, default);
+            return (FollowResultStatus.UserNotFound, Guid.Empty, Guid.Empty);
         }
         if (followeeId is null)
         {
-            return (FollowResultStatus.TargetNotFound, default, default);
+            return (FollowResultStatus.TargetNotFound, Guid.Empty, Guid.Empty);
         }
 
         return followerId == followeeId
-            ? (FollowResultStatus.CannotFollowSelf, default, default)
+            ? (FollowResultStatus.CannotFollowSelf, Guid.Empty, Guid.Empty)
             : (FollowResultStatus.Ok, followerId.Value, followeeId.Value);
     }
 }

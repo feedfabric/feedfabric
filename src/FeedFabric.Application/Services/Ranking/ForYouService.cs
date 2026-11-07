@@ -87,11 +87,12 @@ public class ForYouService(
     private async Task<Session> SessionAsync(Guid viewerId, int offset, ResolvedProfile profile, string key, CancellationToken cancellationToken)
     {
         var session = offset > 0 ? await LoadSessionAsync(key) : null;
-        if (session is null)
+        if (session is not null)
         {
-            session = await RankAsync(viewerId, profile, cancellationToken);
-            await redis.GetDatabase().StringSetAsync(key, JsonSerializer.SerializeToUtf8Bytes(session), SessionLifetime);
+            return session;
         }
+        session = await RankAsync(viewerId, profile, cancellationToken);
+        await redis.GetDatabase().StringSetAsync(key, JsonSerializer.SerializeToUtf8Bytes(session), SessionLifetime);
         return session;
     }
 
@@ -223,7 +224,7 @@ public class ForYouService(
         var byScore = candidates.Select((c, i) =>
         {
             var row = rows[i];
-            List<RankingFactor> factors = newest
+            var factors = newest
                 ? [new RankingFactor("Newest first", 1, row[Age] < 60 ? $"{row[Age]:0} minutes old" : $"{row[Age] / 60:0.#} hours old")]
                 : HeuristicRanker.Factors(row).ToList();
             if (profile.Expression is not null)
@@ -294,6 +295,8 @@ public class ForYouService(
                     return expression.Evaluate(values);
                 }).ToArray();
                 return (scores, expression.UsesModel ? $"expression+{modelRanker}" : "expression");
+            case ScoringMode.Formula:
+            case ScoringMode.Newest:
             default:
                 return (formula, "heuristic");
         }
@@ -427,7 +430,7 @@ public class ForYouQuery
     public string? Cursor { get; set; }
 
     [Range(1, 100, ErrorMessage = ErrorCodes.OutOfRange + ";min={1};max={2}")]
-    public int Limit { get; set; } = 20;
+    public int Limit { get; init; } = 20;
 
     // A ranking profile's key; the configured default when left out
     public string? Profile { get; set; }
@@ -435,7 +438,7 @@ public class ForYouQuery
 
 public class ForYouResponse
 {
-    public required IReadOnlyList<HomeFeedPostResponse> Posts { get; set; }
+    public required IReadOnlyList<HomeFeedPostResponse> Posts { get; init; }
 
     public string? NextCursor { get; set; }
 

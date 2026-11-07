@@ -80,7 +80,7 @@ public class FavouriteService(AppDbContext db, IMediaService media, FeatureBuild
         var posts = db.Posts.Where(p => db.Favourites.Any(f => f.UserId == userId && f.FavouriteId == p.AuthorId)).Live(db, userId);
         if (query.Cursor is { } cursor)
         {
-            posts = posts.Where(p => p.Id.CompareTo(cursor) < 0);
+            posts = posts.Where(p => p.Id < cursor);
         }
         // One extra post tells us whether there is another page
         var found = await posts.OrderByDescending(p => p.Id).ToFeedPosts(db).Take(query.Limit + 1).ToListAsync(cancellationToken);
@@ -105,14 +105,14 @@ public class FavouriteService(AppDbContext db, IMediaService media, FeatureBuild
         var (userId, favouriteId) = await db.Users.FindPairAsync(externalUserId, targetExternalUserId, cancellationToken);
         if (userId is null)
         {
-            return (FavouriteResultStatus.UserNotFound, default, default);
+            return (FavouriteResultStatus.UserNotFound, Guid.Empty, Guid.Empty);
         }
         if (favouriteId is null)
         {
-            return (FavouriteResultStatus.TargetNotFound, default, default);
+            return (FavouriteResultStatus.TargetNotFound, Guid.Empty, Guid.Empty);
         }
         return userId == favouriteId
-            ? (FavouriteResultStatus.CannotFavouriteSelf, default, default)
+            ? (FavouriteResultStatus.CannotFavouriteSelf, Guid.Empty, Guid.Empty)
             : (FavouriteResultStatus.Ok, userId.Value, favouriteId.Value);
     }
 }

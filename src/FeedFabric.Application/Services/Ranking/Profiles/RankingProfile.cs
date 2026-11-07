@@ -18,19 +18,19 @@ public sealed class RankingProfile
 
     public string Description { get; set; } = "";
 
-    public SourceSettings Sources { get; set; } = new();
+    public SourceSettings Sources { get; init; } = new();
 
-    public ScoringSettings Scoring { get; set; } = new();
+    public ScoringSettings Scoring { get; init; } = new();
 
-    public FreshnessSettings Freshness { get; set; } = new();
+    public FreshnessSettings Freshness { get; init; } = new();
 
-    public VarietySettings Variety { get; set; } = new();
+    public VarietySettings Variety { get; init; } = new();
 
-    public ExplorationSettings Exploration { get; set; } = new();
+    public ExplorationSettings Exploration { get; init; } = new();
 
-    public List<BoostRule> Boosts { get; set; } = [];
+    public List<BoostRule> Boosts { get; init; } = [];
 
-    public FilterSettings Filters { get; set; } = new();
+    public FilterSettings Filters { get; init; } = new();
 
     public const int MaxBoosts = 20;
     public const int MaxTags = 50;
@@ -136,30 +136,30 @@ public sealed class RankingProfile
 public sealed class SourceSettings
 {
     // 1. Posts from accounts the viewer follows (their home timeline)
-    public SourceSetting Following { get; set; } = new() { Limit = 300 };
+    public SourceSetting Following { get; init; } = new() { Limit = 300 };
 
     // 2. What's doing well right now on the viewer's top topics
-    public SourceSetting Topics { get; set; } = new();
+    public SourceSetting Topics { get; init; } = new();
 
     // 3. What people with the same taste liked lately
-    public SourceSetting SimilarReaders { get; set; } = new();
+    public SourceSetting SimilarReaders { get; init; } = new();
 
     // 4. Posts close in meaning to what the viewer liked, from anyone
-    public SourceSetting SimilarMeaning { get; set; } = new();
+    public SourceSetting SimilarMeaning { get; init; } = new();
 
     // How many of the viewer's top topics Topics draws on
-    public int TopTopics { get; set; } = 3;
+    public int TopTopics { get; init; } = 3;
 
     // How far back Topics and SimilarReaders look
-    public double LookbackHours { get; set; } = 6;
+    public double LookbackHours { get; init; } = 6;
 }
 
 public sealed class SourceSetting
 {
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; init; } = true;
 
     // The most candidates this source adds
-    public int Limit { get; set; } = 100;
+    public int Limit { get; init; } = 100;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<ScoringMode>))]
@@ -181,28 +181,28 @@ public enum ScoringMode
 
 public sealed class ScoringSettings
 {
-    public ScoringMode Mode { get; set; } = ScoringMode.Model;
+    public ScoringMode Mode { get; init; } = ScoringMode.Model;
 
     // For Mode Expression: e.g. "model * decay_exp(age_hours, 12)"
     public string? Expression { get; set; }
 
     // What each of the model's predictions is worth when adding them up; negative for things to avoid
-    public Goals Goals { get; set; } = new();
+    public Goals Goals { get; init; } = new();
 }
 
 // The value of a post = Σ goal × chance of it happening, for the five things the model predicts
 public sealed class Goals
 {
-    public double Open { get; set; } = 0.5;
+    public double Open { get; init; } = 0.5;
 
-    public double Like { get; set; } = 1;
+    public double Like { get; init; } = 1;
 
-    public double Comment { get; set; } = 3;
+    public double Comment { get; init; } = 3;
 
     // Stayed on it for 10 seconds or more
-    public double LongRead { get; set; } = 2;
+    public double LongRead { get; init; } = 2;
 
-    public double Skip { get; set; } = -1.5;
+    public double Skip { get; init; } = -1.5;
 
     // Keyed by the model's head names
     public Dictionary<string, double> ToDictionary() => new()
@@ -217,31 +217,31 @@ public sealed class FreshnessSettings
     public double? HalfLifeHours { get; set; }
 
     // Leaves out anything older; null for no limit
-    public double? MaxAgeHours { get; set; }
+    public double? MaxAgeHours { get; init; }
 }
 
 public sealed class VarietySettings
 {
     // At most this many posts by one author in any ten
-    public int AuthorCap { get; set; } = 2;
+    public int AuthorCap { get; init; } = 2;
 
     // At most this many posts on the same main topic in a row
-    public int TopicRun { get; set; } = 2;
+    public int TopicRun { get; init; } = 2;
 
     // At least this many posts from accounts the viewer doesn't follow in each ten, when there are any
-    public int OutOfNetwork { get; set; } = 2;
+    public int OutOfNetwork { get; init; } = 2;
 
     // Posts seen in the last day keep this share of their score: 1 for no penalty, 0 to sink them
-    public double SeenPenalty { get; set; } = 0.35;
+    public double SeenPenalty { get; init; } = 0.35;
 }
 
 public sealed class ExplorationSettings
 {
     // Slots in each ten given to a random post from below FromRank. 0 stops the ranker learning about posts it
     // wouldn't pick, so its training data narrows over time.
-    public int Slots { get; set; } = 1;
+    public int Slots { get; init; } = 1;
 
-    public int FromRank { get; set; } = 30;
+    public int FromRank { get; init; } = 30;
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<BoostMatch>))]
@@ -265,12 +265,12 @@ public enum BoostMatch
 // Multiplies the score of posts that match: 1.5 lifts them, 0.5 lowers them, 0 sinks them to the bottom
 public sealed class BoostRule
 {
-    public BoostMatch Match { get; set; }
+    public BoostMatch Match { get; init; }
 
     // The tag (without #) for Tag, the username (without @) for Author
     public string? Value { get; set; }
 
-    public double Multiplier { get; set; } = 1.5;
+    public double Multiplier { get; init; } = 1.5;
 }
 
 public sealed class FilterSettings
@@ -281,9 +281,9 @@ public sealed class FilterSettings
     // When not empty, only posts with at least one of these tags are shown
     public List<string> OnlyTags { get; set; } = [];
 
-    public bool MediaOnly { get; set; }
+    public bool MediaOnly { get; init; }
 
-    public int MinLikes { get; set; }
+    public int MinLikes { get; init; }
 }
 
 public sealed record ProfileError(string Field, string Message, int? Position = null);

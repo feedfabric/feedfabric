@@ -18,7 +18,7 @@ public static class TagBackfill
         {
             var from = after;
             var posts = await db.Posts.AsNoTracking()
-                .Where(p => p.Id.CompareTo(from) > 0 && !db.PostTags.Any(t => t.PostId == p.Id))
+                .Where(p => p.Id > from && !db.PostTags.Any(t => t.PostId == p.Id))
                 .OrderBy(p => p.Id)
                 .Select(p => new { p.Id, p.Content, p.CreatedAt })
                 .Take(BatchSize)

@@ -153,7 +153,7 @@ public class HomeFeedService(
             .Where(p => p.AuthorId == userId || db.Follows.Any(f => f.FollowerId == userId && f.FolloweeId == p.AuthorId));
         if (before is { } cursor)
         {
-            posts = posts.Where(p => p.Id.CompareTo(cursor) < 0);
+            posts = posts.Where(p => p.Id < cursor);
         }
 
         return posts.OrderByDescending(p => p.Id).ToFeedPosts(db).Take(take).ToListAsync(cancellationToken);

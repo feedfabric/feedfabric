@@ -79,15 +79,19 @@ public sealed class ModelsHealthCheck(IBlobStorage storage, IReadOnlyList<string
 
 public static class HealthCheckBuilderExtensions
 {
-    public static IHealthChecksBuilder AddPostgres(this IHealthChecksBuilder builder) =>
-        builder.AddCheck<PostgresHealthCheck>("postgres", HealthStatus.Unhealthy, [HealthTags.Ready]);
+    extension(IHealthChecksBuilder builder)
+    {
+        public IHealthChecksBuilder AddPostgres() =>
+            builder.AddCheck<PostgresHealthCheck>("postgres", HealthStatus.Unhealthy, [HealthTags.Ready]);
 
-    public static IHealthChecksBuilder AddRedis(this IHealthChecksBuilder builder, HealthStatus failureStatus) =>
-        builder.AddCheck<RedisHealthCheck>("redis", failureStatus, [HealthTags.Ready]);
+        public IHealthChecksBuilder AddRedis(HealthStatus failureStatus) =>
+            builder.AddCheck<RedisHealthCheck>("redis", failureStatus, [HealthTags.Ready]);
 
-    public static IHealthChecksBuilder AddClamAv(this IHealthChecksBuilder builder) =>
-        builder.AddCheck<ClamAvHealthCheck>("clamav", HealthStatus.Unhealthy, [HealthTags.Ready]);
+        public IHealthChecksBuilder AddClamAv() =>
+            builder.AddCheck<ClamAvHealthCheck>("clamav", HealthStatus.Unhealthy, [HealthTags.Ready]);
+    }
 
+    // A classic extension method: inside the extension block, params gets the wrong nullability at call sites (CS8620)
     public static IHealthChecksBuilder AddModels(this IHealthChecksBuilder builder, HealthStatus failureStatus, params string[] prefixes) =>
         builder.Add(new HealthCheckRegistration("models",
             services => new ModelsHealthCheck(services.GetRequiredService<IBlobStorage>(), prefixes), failureStatus, [HealthTags.Ready]));

@@ -22,7 +22,7 @@ public class ReviewItemResponse
     // "post" or "comment"
     public required string Kind { get; set; }
 
-    public required Guid PostId { get; set; }
+    public required Guid PostId { get; init; }
 
     public Guid? CommentId { get; set; }
 
@@ -213,12 +213,16 @@ public class ReviewService(AppDbContext db, FeedLog feedLog, TimeProvider timePr
         var authorIds = rows.Select(r => r.Comment?.AuthorId ?? r.Post.AuthorId).Distinct().ToList();
         var authors = await db.Users.Where(u => authorIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => new UserRef(u.ExternalUserId, u.Username), cancellationToken);
-        return rows.Select(r => r.Comment is { } c
-                ? new AdminReportRow(r.Id, r.Reason, r.CreatedAt, r.Reporter, "comment", r.PostId, r.CommentId, authors[c.AuthorId],
+        return
+        [
+            .. rows.Select(r => r.Comment is { } c
+                ? new AdminReportRow(r.Id, r.Reason, r.CreatedAt, r.Reporter, "comment", r.PostId, r.CommentId,
+                    authors[c.AuthorId],
                     AdminStatus.Excerpt(c.Content, 160), AdminStatus.Of(c.Status, c.DeletedAt))
-                : new AdminReportRow(r.Id, r.Reason, r.CreatedAt, r.Reporter, "post", r.PostId, null, authors[r.Post.AuthorId],
+                : new AdminReportRow(r.Id, r.Reason, r.CreatedAt, r.Reporter, "post", r.PostId, null,
+                    authors[r.Post.AuthorId],
                     AdminStatus.Excerpt(r.Post.Content, 160), AdminStatus.Of(r.Post.Status, r.Post.DeletedAt)))
-            .ToList();
+        ];
     }
 
     // Waiting for a reviewer: held or reported, not yet decided, and not since deleted by its author

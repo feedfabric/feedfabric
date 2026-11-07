@@ -74,7 +74,7 @@ public class RepostService(AppDbContext db, TimeProvider timeProvider) : IRepost
         var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
         if (userId is null)
         {
-            return (RepostResultStatus.UserNotFound, default, default);
+            return (RepostResultStatus.UserNotFound, Guid.Empty, Guid.Empty);
         }
 
         var originalId = await db.Posts
@@ -84,7 +84,7 @@ public class RepostService(AppDbContext db, TimeProvider timeProvider) : IRepost
             .Select(id => (Guid?)id)
             .SingleOrDefaultAsync(cancellationToken);
         return originalId is null
-            ? (RepostResultStatus.PostNotFound, default, default)
+            ? (RepostResultStatus.PostNotFound, Guid.Empty, Guid.Empty)
             : (RepostResultStatus.Ok, userId.Value, originalId.Value);
     }
 }
