@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -8,8 +9,10 @@ using FeedFabric.Api.Admin;
 using FeedFabric.Api.Dev;
 using FeedFabric.Api.Storage;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.Hosting;
 using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Feed;
@@ -40,6 +43,7 @@ if (args is ["healthcheck", ..])
 }
 
 var builder = WebApplication.CreateBuilder(args);
+StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis");
 
 // Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
 builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
@@ -105,6 +109,19 @@ builder.Services.AddFeedFabricAuth(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment).AddModerationPolicies(builder.Environment)
     .AddAdminPolicies(builder.Environment);
 builder.Services.AddHttpContextAccessor();
+// Behind a TLS-terminating proxy (ProxyOptions)
+var proxy = builder.Configuration.GetSection(ProxyOptions.Section).Get<ProxyOptions>() ?? new ProxyOptions();
+builder.Services.Configure<ForwardedHeadersOptions>(proxy.ApplyTo);
+builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+// Browsers on these origins (the admin panel, a web front end) may call the API. Tokens go in the Authorization
+// header, not cookies, so credentials aren't allowed. Empty: no CORS headers, serve front ends from the API's origin.
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(corsOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .WithExposedHeaders("Retry-After")
+    .SetPreflightMaxAge(TimeSpan.FromHours(1))));
 // /health/live and /health/ready. Without Redis the API still serves (feeds fall back to Postgres), so it only
 // degrades readiness; without the toxicity model nothing can be posted.
 builder.Services.AddHealthChecks()
@@ -143,13 +160,26 @@ if (app.Environment.IsDevelopment())
     await TagBackfill.RunAsync(db, app.Logger);
 }
 
+if (!app.Environment.IsDevelopment() && app.Configuration["AllowedHosts"] is null or "*")
+{
+    app.Logger.LogWarning("AllowedHosts is \"*\": set it to the API's host names so requests for other hosts are refused");
+}
+
 // Configure the HTTP request pipeline.
+if (proxy.Enabled)
+{
+    app.UseForwardedHeaders();
+}
 // Kestrel's own refusals (a body over the limit is 413) keep their status rather than becoming a 500
 app.UseExceptionHandler(new ExceptionHandlerOptions
 {
     StatusCodeSelector = exception => exception is Microsoft.AspNetCore.Http.BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError,
 });
 app.UseStatusCodePages();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -159,7 +189,12 @@ if (app.Environment.IsDevelopment())
 // The admin panel's overview; the panel itself (web/admin) is a separate static site
 app.MapDashboardEndpoints();
 
-app.UseHttpsRedirection();
+// Not the health checks: probes call the container over plain HTTP
+app.UseWhen(http => !http.Request.Path.StartsWithSegments("/health"), branch => branch.UseHttpsRedirection());
+if (corsOrigins.Length > 0)
+{
+    app.UseCors();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();

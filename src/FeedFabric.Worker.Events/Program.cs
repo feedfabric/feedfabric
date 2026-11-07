@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using FeedFabric.Application.Services;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Health;
 using FeedFabric.Application.Services.Embeddings;
@@ -27,6 +28,7 @@ if (args is ["healthcheck", ..])
 
 // A web host only to serve /health/live and /health/ready (port 8080 in the container); the work is the hosted services
 var builder = WebApplication.CreateSlimBuilder(args);
+StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis", "Kafka:BootstrapServers");
 
 // Pooled: each event gets its own scope, and so a context, which is reset and reused rather than built again
 builder.Services.AddDbContextPool<AppDbContext>(options =>
