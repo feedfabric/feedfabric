@@ -1,7 +1,7 @@
 ---
 layout: ../../layouts/Doc.astro
 title: Cloudflare
-description: What of FeedFabric runs on Cloudflare and how. These docs and your front ends as static assets on Workers, R2 for photos and models, Cloudflare Access for the admin panel, and Cloudflare in front of the API.
+description: What of FeedFabric runs on Cloudflare and how. Your front ends as static assets on Workers, R2 for photos and models, Cloudflare Access for the admin panel, and Cloudflare in front of the API.
 ---
 
 FeedFabric's API and worker are .NET services that talk to Postgres, Redis and Kafka, so they run on your own
@@ -9,87 +9,13 @@ server ([Deploying FeedFabric](/deploy/)). Everything around them can live on Cl
 
 | Part | On Cloudflare |
 |---|---|
-| These docs | Static assets on Workers: `web/docs/wrangler.jsonc` |
 | Your front end, the admin panel | Static assets on Workers, with a few lines of Worker code passing API calls to your server |
 | Photos and models | R2, through FeedFabric's S3 storage |
 | The admin panel's door | Cloudflare Access, so only staff reach it |
 | The API | Behind Cloudflare's proxy, for TLS, caching rules and rate limiting |
 
-All of it uses [Wrangler](https://developers.cloudflare.com/workers/wrangler/), Cloudflare's CLI, which is a dev
-dependency of the docs site (`npx wrangler`).
-
-## Deploying these docs
-
-The site is plain static files (`npm run build` writes `dist/`, with the search index), served by Workers static
-assets with no Worker code at all. `web/docs/wrangler.jsonc` sets it up:
-
-```jsonc
-{
-  "name": "feedfabric-docs",
-  "compatibility_date": "2026-11-01",
-  "assets": {
-    "directory": "./dist",
-    "html_handling": "auto-trailing-slash",   // /auth serves /auth/index.html
-    "not_found_handling": "404-page"           // unknown paths get dist/404.html with a 404
-  },
-  "workers_dev": true,
-  "preview_urls": true
-}
-```
-
-`public/_headers` adds security headers to every response and long-lived caching to Astro's hashed bundles.
-
-### From your machine
-
-```bash
-cd web/docs
-npm ci
-npx wrangler login       # once: opens the browser to sign in to Cloudflare
-npm run deploy           # builds, then uploads dist/ as the feedfabric-docs Worker
-```
-
-The first deploy prints the address, `https://feedfabric-docs.<your-subdomain>.workers.dev`. To check the built site
-before deploying, `npm run preview:cloudflare` serves it locally with the same asset handling Cloudflare uses.
-
-### Your own domain
-
-With the domain's DNS on Cloudflare, add it to `wrangler.jsonc` and deploy again; Cloudflare creates the DNS record
-and the certificate:
-
-```jsonc
-"routes": [{ "pattern": "docs.feedfabric.dev", "custom_domain": true }]
-```
-
-Build with `SITE_URL` set, so every page has its canonical address:
-
-```bash
-SITE_URL=https://docs.feedfabric.dev npm run deploy
-```
-
-### From GitHub Actions
-
-`.github/workflows/docs.yml` builds the site on every pull request that touches it, and deploys it on every push to
-`main`. It needs two repository secrets (*Settings → Secrets and variables → Actions*):
-
-| Secret | Where to get it |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → *My Profile → API Tokens → Create Token*, the **Edit Cloudflare Workers** template, limited to your account |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → *Workers & Pages*, in the sidebar; or `npx wrangler whoami` |
-
-And optionally one repository variable, `DOCS_SITE_URL` (for example `https://docs.feedfabric.dev`), for canonical
-links. Until the secrets exist, pull requests still build and the deploy job is skipped.
-
-Pull requests from branches in the repository also get a **preview**: the workflow uploads a new version without
-deploying it and links its preview URL in the run's summary.
-
-<div class="note">
-
-**Cloudflare's Git integration works too.** Instead of the workflow, connect the repository under *Workers & Pages →
-Create → Import a repository*, with root directory `web/docs`, build command `npm ci && npm run build` and deploy
-command `npx wrangler deploy`. The build reads FabricUI's styles from `web/fabric-ui`, which is fine: Cloudflare
-clones the whole repository. Use one or the other, not both.
-
-</div>
+The Worker parts use [Wrangler](https://developers.cloudflare.com/workers/wrangler/), Cloudflare's CLI
+(`npm install -D wrangler` in your app, then `npx wrangler login` once).
 
 ## R2 for photos and models
 

@@ -1,7 +1,7 @@
 ---
 layout: ../layouts/Doc.astro
 title: Contributing to the docs
-description: How this site is built, how to run it, add or change a page, and how changes reach the live site. Every page has an "Edit this page" link; this is what happens after you press it.
+description: How this site is built, how to run it, and how to add or change a page. Every page has an "Edit this page" link; this is what happens after you press it.
 ---
 
 These docs live in the FeedFabric repository, in `web/docs`, next to the code they describe, so a change to how
@@ -26,9 +26,6 @@ npm run build             # Astro, then Pagefind: everything in dist/
 npm run preview           # serves dist/ at http://localhost:5186
 ```
 
-`npm run preview:cloudflare` serves `dist/` the way Cloudflare does (trailing slashes, the 404 page, `_headers`),
-which is worth a look after changing `wrangler.jsonc` or `public/_headers`.
-
 ## How it's put together
 
 | Path | What it is |
@@ -39,8 +36,7 @@ which is worth a look after changing `wrangler.jsonc` or `public/_headers`.
 | `src/layouts/Doc.astro` | The frame of every page: header, search, sidebar, contents, edit link, footer |
 | `src/styles/docs.css` | The site's styles, on top of FabricUI's tokens (`web/fabric-ui/src/styles/fabric.css`) |
 | `src/site.ts` | The repository's address, for the GitHub and edit links |
-| `public/` | Copied as is: the icon, `_headers` for Cloudflare, `robots.txt` |
-| `wrangler.jsonc` | How Cloudflare serves it ([Cloudflare](/deploy/cloudflare/#deploying-these-docs)) |
+| `public/` | Copied as is: the icon, `_headers`, `robots.txt` |
 
 It's [Astro](https://astro.build) with no UI framework and almost no JavaScript: the theme switch, the phone menu and
 search.
@@ -101,14 +97,6 @@ cd web/docs && npm run build
 
 The build fails on broken Markdown, a missing layout or a TypeScript error in the layout. It doesn't check links,
 so click through the pages you changed. CI builds the site on every pull request that touches `web/docs`.
-
-## From pull request to live site
-
-1. Open a pull request. The **Docs** workflow builds the site and, for branches in the repository, uploads a preview
-   version on Cloudflare; its address is in the run's summary.
-2. Once it's merged to `main`, the same workflow deploys it. The live site updates within a minute or two.
-
-The workflow is `.github/workflows/docs.yml`; [Cloudflare](/deploy/cloudflare/#from-github-actions) has its setup.
 
 ## Beyond the docs
 
