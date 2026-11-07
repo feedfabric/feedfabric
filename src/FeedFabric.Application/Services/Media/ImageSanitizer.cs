@@ -95,7 +95,7 @@ public static class ImageSanitizer
                 canvas.RotateDegrees(-90);
                 break;
         }
-        canvas.DrawBitmap(source, 0, 0);
+        canvas.DrawBitmap(source, 0, 0, SKSamplingOptions.Default);
         return result;
     }
 }
