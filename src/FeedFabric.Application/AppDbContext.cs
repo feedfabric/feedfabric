@@ -73,6 +73,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PostEntity>()
             .HasIndex(p => new { p.AuthorId, p.Id });
 
+        // Serves "posts in the last N minutes" (dashboard, embedding backfill). Rows arrive in CreatedAt order, so a
+        // BRIN index does it at a fraction of a B-tree's size and write cost; the same goes for Likes and Comments.
+        modelBuilder.Entity<PostEntity>()
+            .HasIndex(p => p.CreatedAt)
+            .HasMethod("brin");
+
         modelBuilder.Entity<PostEntity>()
             .HasOne<PostEntity>()
             .WithMany()
@@ -127,6 +133,15 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<LikeEntity>()
             .HasIndex(l => new { l.PostId, l.UserId });
 
+        // Serves "what this user liked lately": the viewer's taste vector and For You's similar readers
+        modelBuilder.Entity<LikeEntity>()
+            .HasIndex(l => new { l.UserId, l.CreatedAt })
+            .IncludeProperties(l => l.PostId);
+
+        modelBuilder.Entity<LikeEntity>()
+            .HasIndex(l => l.CreatedAt)
+            .HasMethod("brin");
+
         modelBuilder.Entity<LikeEntity>()
             .HasOne<UserEntity>()
             .WithMany()
@@ -146,6 +161,14 @@ public class AppDbContext : DbContext
         // Serves "replies to this comment" in order, and reply counts
         modelBuilder.Entity<CommentEntity>()
             .HasIndex(c => new { c.ParentCommentId, c.Id });
+
+        // Serves "what this user commented on lately"; replaces the plain AuthorId index EF would add
+        modelBuilder.Entity<CommentEntity>()
+            .HasIndex(c => new { c.AuthorId, c.CreatedAt });
+
+        modelBuilder.Entity<CommentEntity>()
+            .HasIndex(c => c.CreatedAt)
+            .HasMethod("brin");
 
         modelBuilder.Entity<CommentEntity>()
             .HasOne<PostEntity>()
@@ -252,9 +275,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(pm => pm.MediaId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Serves label updates: "this viewer just liked this post, which they were served in the last hour"
+        // Serves everything that reads one viewer's recent rows: label updates ("this viewer just liked this post,
+        // served in the last hour"), "seen in the last day" and the ranker's per-author and per-session history. The
+        // time range narrows it first, so it stays fast however long the viewer's history gets; PostId is checked in
+        // the index without visiting the table.
         modelBuilder.Entity<FeedLogEntity>()
-            .HasIndex(f => new { f.ViewerId, f.PostId, f.ServedAt });
+            .HasIndex(f => new { f.ViewerId, f.ServedAt, f.PostId });
 
         // Serves the dashboard's windows and training exports
         modelBuilder.Entity<FeedLogEntity>()
@@ -322,5 +348,9 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ProcessedEventEntity>()
             .HasKey(e => new { e.EventId, e.Consumer });
+
+        // Serves the dashboard's "when did each consumer last finish an event" without reading the whole table
+        modelBuilder.Entity<ProcessedEventEntity>()
+            .HasIndex(e => new { e.Consumer, e.ProcessedAt });
     }
 }

@@ -126,13 +126,19 @@ public class ImpressionService(AppDbContext db, IConnectionMultiplexer redis, Fe
     {
         var database = redis.GetDatabase();
         var ids = postIds.Distinct().ToList();
-        var totals = ids.Select(id => database.SortedSetScoreAsync(ImpressionKeys.PostTotals, id.ToString())).ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, PostSignals>();
+        }
+        // The totals are one sorted set each, so one ZMSCORE reads every post's score
+        var members = ids.Select(id => (RedisValue)id.ToString()).ToArray();
+        var totals = database.SortedSetScoresAsync(ImpressionKeys.PostTotals, members);
+        var opens = database.SortedSetScoresAsync(ImpressionKeys.OpenTotals, members);
         var viewers = ids.Select(id => database.HyperLogLogLengthAsync(ImpressionKeys.Viewers(id))).ToList();
-        var opens = ids.Select(id => database.SortedSetScoreAsync(ImpressionKeys.OpenTotals, id.ToString())).ToList();
         var dwell = ids.Select(id => database.HashGetAsync(ImpressionKeys.PostDwell(id), ["n", "ms"])).ToList();
-        await Task.WhenAll(totals.Cast<Task>().Concat(viewers).Concat(opens).Concat(dwell));
+        await Task.WhenAll(viewers.Cast<Task>().Concat(dwell).Append(totals).Append(opens));
         return ids.Select((id, i) => (id, new PostSignals(
-                (long)(totals[i].Result ?? 0), viewers[i].Result, (long)(opens[i].Result ?? 0),
+                (long)(totals.Result[i] ?? 0), viewers[i].Result, (long)(opens.Result[i] ?? 0),
                 Long(dwell[i].Result[0]), Long(dwell[i].Result[1]))))
             .ToDictionary(x => x.id, x => x.Item2);
     }

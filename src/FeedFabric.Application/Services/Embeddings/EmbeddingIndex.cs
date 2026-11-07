@@ -18,14 +18,40 @@ public sealed class EmbeddingIndex(IServiceScopeFactory scopes, TimeProvider tim
     public async Task<IReadOnlyList<(Guid PostId, float Similarity)>> NearestAsync(float[] query, int take, ISet<Guid> exclude, CancellationToken cancellationToken)
     {
         await RefreshAsync(cancellationToken);
+        if (take <= 0)
+        {
+            return [];
+        }
+
+        // Keeps only the best `take` so far in a min-heap, rather than scoring and sorting every post: the work and
+        // memory stay at the size of the answer, not of the index
+        var best = new PriorityQueue<Guid, float>(take + 1);
         lock (posts)
         {
-            return posts.Where(p => !exclude.Contains(p.Key))
-                .Select(p => (p.Key, TextEmbedder.Cosine(query, p.Value.Vector)))
-                .OrderByDescending(p => p.Item2)
-                .Take(take)
-                .ToList();
+            foreach (var (postId, entry) in posts)
+            {
+                if (exclude.Contains(postId))
+                {
+                    continue;
+                }
+                var similarity = TextEmbedder.Cosine(query, entry.Vector);
+                if (best.Count < take)
+                {
+                    best.Enqueue(postId, similarity);
+                }
+                else if (best.TryPeek(out _, out var worst) && similarity > worst)
+                {
+                    best.DequeueEnqueue(postId, similarity);
+                }
+            }
         }
+
+        var nearest = new (Guid PostId, float Similarity)[best.Count];
+        for (var i = nearest.Length - 1; best.TryDequeue(out var postId, out var similarity); i--)
+        {
+            nearest[i] = (postId, similarity);
+        }
+        return nearest;
     }
 
     private async Task RefreshAsync(CancellationToken cancellationToken)

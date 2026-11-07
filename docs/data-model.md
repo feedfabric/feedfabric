@@ -112,7 +112,7 @@ Split out so notifications and topic features don't need to parse text.
 |---|---|---|
 | UserId | `Guid` | Composite key with PostId |
 | PostId | `Guid` | Index on its own for "who liked this" |
-| CreatedAt | `DateTime` | |
+| CreatedAt | `DateTime` | Index with UserId for "what this user liked lately"; a BRIN index on its own for time windows |
 | Source | `string?` | Client or API key, lets you discount bot traffic |
 
 ### Bookmark

@@ -53,7 +53,11 @@ namespace FeedFabric.Application.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorId");
+                    b.HasIndex("CreatedAt");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CreatedAt"), "brin");
+
+                    b.HasIndex("AuthorId", "CreatedAt");
 
                     b.HasIndex("ParentCommentId", "Id");
 
@@ -111,7 +115,15 @@ namespace FeedFabric.Application.Migrations
 
                     b.HasKey("UserId", "PostId");
 
+                    b.HasIndex("CreatedAt");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CreatedAt"), "brin");
+
                     b.HasIndex("PostId", "UserId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("UserId", "CreatedAt"), new[] { "PostId" });
 
                     b.ToTable("Likes");
                 });
@@ -276,6 +288,8 @@ namespace FeedFabric.Application.Migrations
 
                     b.HasKey("EventId", "Consumer");
 
+                    b.HasIndex("Consumer", "ProcessedAt");
+
                     b.ToTable("ProcessedEvents");
                 });
 
@@ -349,7 +363,7 @@ namespace FeedFabric.Application.Migrations
 
                     b.HasIndex("ServedAt");
 
-                    b.HasIndex("ViewerId", "PostId", "ServedAt");
+                    b.HasIndex("ViewerId", "ServedAt", "PostId");
 
                     b.ToTable("FeedLog");
                 });
@@ -587,6 +601,10 @@ namespace FeedFabric.Application.Migrations
                         .HasColumnType("character varying(16)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CreatedAt"), "brin");
 
                     b.HasIndex("AuthorId", "Id");
 

@@ -106,7 +106,7 @@ After the simulator has run for a while, run `make train` to train the For You r
 | `make models` | Download the pretrained models into `.blobs/models` |
 | `make tune-toxicity` | Fine-tune the offensive-language model on this app's wording and publish it to `.blobs` (about 45 minutes) |
 | `make train` | Train the ranker on the feed log and publish it as ONNX |
-| `make migration name=AddX` / `make migrate` | Create or apply an EF Core migration (the API also migrates on startup in development) |
+| `make migration name=AddX` / `make migrate` | Create or apply an EF Core migration (the API, worker and simulator also migrate on startup in development) |
 | `make logs` / `make logs-worker` / `make psql` / `make redis` | Logs and shells |
 
 ## API

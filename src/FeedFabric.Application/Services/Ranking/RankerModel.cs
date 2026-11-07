@@ -75,20 +75,28 @@ public sealed class RankerModel(IBlobStorage storage, TimeProvider timeProvider,
     private static double[] Predict(InferenceSession current, IReadOnlyList<double[]> rows)
     {
         var width = RankingFeatures.Names.Length;
-        var input = new DenseTensor<float>(new[] { rows.Count, width });
+        // Filled as one flat row-major array, which is what the tensor holds anyway
+        var values = new float[rows.Count * width];
         for (var i = 0; i < rows.Count; i++)
         {
             for (var j = 0; j < width; j++)
             {
-                input[i, j] = (float)rows[i][j];
+                values[i * width + j] = (float)rows[i][j];
             }
         }
+        var input = new DenseTensor<float>(values, [rows.Count, width]);
 
         var inputName = current.InputMetadata.Keys.First();
         using var results = current.Run([NamedOnnxValue.CreateFromTensor(inputName, input)]);
         // A LightGBM classifier exported without ZipMap: "probabilities" is [rows, 2], column 1 the positive class
-        var probabilities = results.First(r => r.Name == "probabilities").AsTensor<float>();
-        return Enumerable.Range(0, rows.Count).Select(i => (double)probabilities[i, 1]).ToArray();
+        var output = results.First(r => r.Name == "probabilities").AsTensor<float>();
+        var probabilities = (output as DenseTensor<float> ?? output.ToDenseTensor()).Buffer.Span;
+        var scores = new double[rows.Count];
+        for (var i = 0; i < scores.Length; i++)
+        {
+            scores[i] = probabilities[i * 2 + 1];
+        }
+        return scores;
     }
 
     private async Task ReloadAsync(CancellationToken cancellationToken)

@@ -1,3 +1,4 @@
+using System.Numerics;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
@@ -64,16 +65,21 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
         }
 
         using var results = model.Run(inputs);
-        var hidden = results.First().AsTensor<float>();
+        // [texts, tokens, Dimensions], read as one flat span: the tensor's indexer works out an offset per number
+        var output = results.First().AsTensor<float>();
+        var hidden = (output as DenseTensor<float> ?? output.ToDenseTensor()).Buffer.Span;
+        var tokens = output.Dimensions[1];
         var vectors = new float[texts.Count][];
         for (var i = 0; i < texts.Count; i++)
         {
             var vector = new float[Dimensions];
+            var sum = vector.AsSpan();
             for (var j = 0; j < ids[i].Count; j++)
             {
+                var token = hidden.Slice((i * tokens + j) * Dimensions, Dimensions);
                 for (var d = 0; d < Dimensions; d++)
                 {
-                    vector[d] += hidden[i, j, d];
+                    sum[d] += token[d];
                 }
             }
             vectors[i] = Normalise(vector, ids[i].Count);
@@ -81,12 +87,22 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
         return vectors;
     }
 
+    // Several floats at a time with SIMD: For You compares the viewer with every post in the last day
     public static float Cosine(float[] a, float[] b)
     {
-        var sum = 0f;
-        for (var i = 0; i < a.Length; i++)
+        var x = a.AsSpan();
+        var y = b.AsSpan(0, x.Length);
+        var width = Vector<float>.Count;
+        var sums = Vector<float>.Zero;
+        var i = 0;
+        for (; i <= x.Length - width; i += width)
         {
-            sum += a[i] * b[i];
+            sums += new Vector<float>(x[i..]) * new Vector<float>(y[i..]);
+        }
+        var sum = Vector.Sum(sums);
+        for (; i < x.Length; i++)
+        {
+            sum += x[i] * y[i];
         }
         return sum;
     }

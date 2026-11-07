@@ -24,17 +24,23 @@ public sealed class NudityClassifier(IBlobStorage storage) : IDisposable
         using var resized = bitmap.Resize(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Unpremul), new SKSamplingOptions(SKFilterMode.Linear));
 
         // NCHW, each channel rescaled to 0..1 then normalised: (x - mean) / std, as the model was trained
-        var input = new DenseTensor<float>([1, 3, size, size]);
+        // Read straight from the RGBA pixel buffer rather than a native GetPixel call for each pixel
+        var pixels = resized.GetPixelSpan();
+        var rowBytes = resized.RowBytes;
+        var plane = size * size;
+        var values = new float[3 * plane];
         for (var y = 0; y < size; y++)
         {
             for (var x = 0; x < size; x++)
             {
-                var pixel = resized.GetPixel(x, y);
-                input[0, 0, y, x] = (pixel.Red / 255f - settings.Mean[0]) / settings.Std[0];
-                input[0, 1, y, x] = (pixel.Green / 255f - settings.Mean[1]) / settings.Std[1];
-                input[0, 2, y, x] = (pixel.Blue / 255f - settings.Mean[2]) / settings.Std[2];
+                var pixel = y * rowBytes + x * 4;
+                var i = y * size + x;
+                values[i] = (pixels[pixel] / 255f - settings.Mean[0]) / settings.Std[0];
+                values[plane + i] = (pixels[pixel + 1] / 255f - settings.Mean[1]) / settings.Std[1];
+                values[2 * plane + i] = (pixels[pixel + 2] / 255f - settings.Mean[2]) / settings.Std[2];
             }
         }
+        var input = new DenseTensor<float>(values, [1, 3, size, size]);
 
         using var results = model.Run([NamedOnnxValue.CreateFromTensor(model.InputMetadata.Keys.First(), input)]);
         var logits = results.First().AsTensor<float>();
