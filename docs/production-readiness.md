@@ -16,7 +16,6 @@ can be observed and operated, and meet UK GDPR obligations for health-adjacent u
 | 16 | Move `EmbeddingIndex` out of each API instance (needs a pgvector migration, so not done with this plan) | |
 | 16 | Set the load target, then run `tools/load/feeds.js` against it | Kieran |
 | 18 | The staff audit log is structured logs; move it to a table if staff need to search it in the admin panel (needs a migration) | |
-| 18 | Pin the GitHub Actions to commit SHAs, `aquasecurity/trivy-action` first | |
 
 ## P0: blockers
 
@@ -140,7 +139,7 @@ because the images have no curl. The checks are in [deploying.md](deploying.md#h
 - API responses carry security headers: `nosniff`, `X-Frame-Options: DENY`, a deny-all CSP, `Referrer-Policy`,
   `Permissions-Policy`, and `no-store` by default. They don't carry a `Server` header.
 - Staff changes are logged in the `FeedFabric.Audit` category ([runbooks.md](runbooks.md#the-staff-audit-log)).
-- Dependabot covers NuGet, npm, uv, Docker and Actions.
+- Dependabot covers NuGet, npm, uv, Docker and Actions. The Actions are pinned to commit SHAs.
 - Trivy scans each image in CI and fails on fixable critical or high vulnerabilities. The images install Ubuntu's
   security updates.
 - Security review of `Auth` and the admin controllers:
