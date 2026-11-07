@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
+using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
 using FeedFabric.Application.Services.Users;
 
@@ -40,6 +41,22 @@ public class AuthorizationTests(ApiFactory api)
         Assert.Equal(reviewer, (await policies.AuthorizeAsync(user, ModerationPolicies.Reviewer)).Succeeded);
         Assert.Equal(rankingAdmin, (await policies.AuthorizeAsync(user, RankingPolicies.Admin)).Succeeded);
         Assert.Equal(staff, (await policies.AuthorizeAsync(user, AdminPolicies.Staff)).Succeeded);
+    }
+
+    [Fact]
+    public async Task A_token_cant_bring_its_own_FeedFabric_claims()
+    {
+        // As JwtBearer hands it over: the token's claims under their own names
+        var token = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", "alice"), new Claim(IdentityClaims.UserId, "bob"), new Claim(IdentityClaims.Role, ModerationPolicies.ReviewerRole)],
+            "Bearer"));
+
+        var user = await new IdentityClaims(Options.Create(new AuthOptions())).TransformAsync(token);
+
+        Assert.Equal("alice", user.FindFirstValue(IdentityClaims.UserId));
+        Assert.Single(user.FindAll(IdentityClaims.UserId));
+        Assert.False(user.HasClaim(c => c.Type == IdentityClaims.Role));
+        Assert.False((await Policies(Environments.Production).AuthorizeAsync(user, ModerationPolicies.Reviewer)).Succeeded);
     }
 
     [Fact]
