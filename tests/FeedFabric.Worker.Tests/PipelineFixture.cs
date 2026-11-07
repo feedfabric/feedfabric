@@ -30,7 +30,7 @@ public sealed class PipelineFixture : IAsyncLifetime
     private static readonly string RepoBlobs = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../.blobs"));
 
     private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RedisContainer redis = new RedisBuilder("redis:7.4").Build();
+    private readonly RedisContainer redis = new RedisBuilder("valkey/valkey:8").Build();
     private readonly KafkaContainer kafka = new KafkaBuilder("apache/kafka:4.0.0").Build();
     private readonly string blobs = Directory.CreateTempSubdirectory("feedfabric-pipeline-").FullName;
     private WorkerFactory? worker;

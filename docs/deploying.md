@@ -71,7 +71,7 @@ idempotent.
 | Dependency | Notes |
 |---|---|
 | PostgreSQL 17 | `ConnectionStrings:Default` |
-| Redis 7 | `ConnectionStrings:Redis`. Persistence is optional: a lost timeline is rebuilt by fan-out ([runbooks.md](runbooks.md#rebuild-redis-timelines)). |
+| Valkey 8 or Redis 7 | `ConnectionStrings:Redis`. Valkey is the BSD-licensed fork; anything speaking the Redis protocol works. Persistence is optional: a lost timeline is rebuilt by fan-out ([runbooks.md](runbooks.md#rebuild-redis-timelines)). |
 | Kafka | `Kafka:BootstrapServers`, with 3 or more brokers (`Kafka:ReplicationFactor`) and `Kafka:Security` for SASL/TLS. The worker creates its topics on startup. |
 | S3 or S3-compatible storage | `BlobStorage:S3:*`, with the models published to it (`ml/fetch_models.py --s3-bucket`) |
 | ClamAV (clamd) | `MalwareScanning:ClamAv:Host`, reachable from the worker |

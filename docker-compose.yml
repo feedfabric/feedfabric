@@ -44,17 +44,18 @@ services:
       retries: 20
       start_period: 10s
 
-  # Home timelines. appendonly keeps them across restarts; they can always be rebuilt from Postgres.
+  # Home timelines. appendonly keeps them across restarts; they can always be rebuilt from Postgres. Valkey is the
+  # BSD-licensed fork of Redis and speaks the same protocol, so Redis itself works here too.
   redis:
-    image: redis:7.4
+    image: valkey/valkey:8
     restart: always
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["valkey-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

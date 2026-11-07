@@ -75,7 +75,7 @@ API's `Moderation` and `MalwareScanning` values while the worker acts on its own
 | Setting | Default | Notes |
 |---|---|---|
 | `ConnectionStrings:Default` | none | PostgreSQL, e.g. `Host=db;Port=5432;Database=feedfabric;Username=…;Password=…`. Required. Secret. |
-| `ConnectionStrings:Redis` | `localhost:6379` | Home timelines. The API starts without Redis and falls back to Postgres; the worker needs it. |
+| `ConnectionStrings:Redis` | `localhost:6379` | Valkey, or Redis: anything speaking the Redis protocol. Home timelines. The API starts without it and falls back to Postgres; the worker needs it. |
 
 ## Auth
 

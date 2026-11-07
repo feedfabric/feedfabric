@@ -29,7 +29,7 @@ psql:
 	docker compose exec db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
 redis:
-	docker compose exec redis redis-cli
+	docker compose exec redis valkey-cli
 
 # Runs the API on the host against the compose db
 run:

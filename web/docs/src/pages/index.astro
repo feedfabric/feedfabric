@@ -42,7 +42,7 @@ const headings = [
   </table>
   <p>
     Stores: <strong>PostgreSQL 17</strong> is the source of truth (posts, users, follows, likes, the feed log, the
-    outbox). <strong>Redis 7.4</strong> holds what's fast and rebuildable: timelines, For You sessions, affinity and
+    outbox). <strong>Valkey 8</strong> (or Redis) holds what's fast and rebuildable: timelines, For You sessions, affinity and
     topic scores, impression and dwell counters, embeddings. <strong>Kafka 4</strong> carries events between them.
     <strong>Blob storage</strong> (a local folder in development, any S3-compatible service elsewhere) holds photos and
     the models, which all run on CPU with ONNX Runtime.

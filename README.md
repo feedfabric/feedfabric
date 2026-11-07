@@ -14,7 +14,7 @@
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white">
   <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
   <img alt="Apache Kafka 4" src="https://img.shields.io/badge/Kafka-4.0-231F20?logo=apachekafka&logoColor=white">
-  <img alt="Redis 7.4" src="https://img.shields.io/badge/Redis-7.4-FF4438?logo=redis&logoColor=white">
+  <img alt="Valkey 8" src="https://img.shields.io/badge/Valkey-8-6983FF">
   <img alt="ONNX Runtime" src="https://img.shields.io/badge/ONNX_Runtime-1.31-005CED?logo=onnx&logoColor=white">
   <img alt="LightGBM" src="https://img.shields.io/badge/LightGBM-ranker-9ACD32">
   <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs&logoColor=white">
@@ -81,7 +81,7 @@ You need Docker, the .NET 10 SDK, Node 22+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 cp .env.example .env
 make models      # download the safety and embedding models (once)
-make up          # Postgres, Kafka, Redis, API and worker
+make up          # Postgres, Kafka, Valkey (Redis-compatible), API and worker
 make backfill    # seed users and backfill 60 days of conversations (fresh database only), then stop
 make admin       # the admin panel at http://localhost:5185
 ```

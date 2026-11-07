@@ -15,7 +15,7 @@ public sealed class WorkerFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:17").Build();
     private readonly KafkaContainer kafka = new KafkaBuilder("apache/kafka:4.0.0").Build();
-    private readonly RedisContainer redis = new RedisBuilder("redis:7.4").Build();
+    private readonly RedisContainer redis = new RedisBuilder("valkey/valkey:8").Build();
 
     public string BootstrapServers => kafka.GetBootstrapAddress();
 
