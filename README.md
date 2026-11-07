@@ -68,7 +68,7 @@ flowchart LR
 | `src/FeedFabric.Api` | REST API, feed ranking and text moderation |
 | `src/FeedFabric.Application` | Domain, EF Core, services, ranking and safety |
 | `src/FeedFabric.Worker.Events` | Outbox publisher and Kafka consumers: fan-out, engagement, media scanning, embeddings |
-| `src/FeedFabric.Simulator` | Seeds users, backfills conversations, and posts, reads and engages in real time |
+| `src/FeedFabric.Simulator` | Seeds users and backfills conversations for a demo; optionally keeps posting, reading and engaging in real time |
 | `web/admin` | Vue 3 admin panel: dashboard, moderation, users, posts, Feed studio and system settings |
 | `web/fabric-ui` | FabricUI: the Vue 3 components and design tokens the admin panel is built with |
 | `ml/` | Ranker training, synthetic conversation generator and model downloads (Python, `uv`) |
@@ -82,7 +82,7 @@ You need Docker, the .NET 10 SDK, Node 22+ and [uv](https://docs.astral.sh/uv/).
 cp .env.example .env
 make models      # download the safety and embedding models (once)
 make up          # Postgres, Kafka, Redis, API and worker
-make simulate    # seed users, backfill 14 days of conversations, then run live
+make backfill    # seed users and backfill 60 days of conversations (fresh database only), then stop
 make admin       # the admin panel at http://localhost:5185
 ```
 
@@ -98,7 +98,8 @@ After the simulator has run for a while, run `make train` to train the For You r
 |---|---|
 | `make up` / `make down` / `make down-all` | Start everything; stop the app containers; stop everything (data is kept) |
 | `make run` / `make run-worker` | Run the API or worker on your machine against Compose |
-| `make simulate` / `make simulate-stop` | Start or stop the simulator |
+| `make backfill` | Seed users and backfill demo history on a fresh database, on your machine at low priority, then stop |
+| `make simulate` / `make simulate-stop` | Start or stop the simulator in Docker (`Simulator__Live=true` keeps it posting after the backfill) |
 | `make admin` / `make admin-build` | Run the admin panel with hot reload at http://localhost:5185; build it as a static site into `web/admin/dist` |
 | `make docs` | The docs site at http://localhost:5186: how it all works, and a guide to building a front end on the API (`web/docs`) |
 | `make openapi` | Save the running API's OpenAPI document into the admin panel's API reference (`web/admin/public/openapi.json`) |
@@ -195,9 +196,9 @@ All of them run with ONNX Runtime on CPU. Versions are pinned in `ml/fetch_model
 
 ## Simulated data
 
-On an empty database the simulator backfills 14 days of history through the real services, so moderation, tagging, events and fan-out all run. The history comes from a synthetic, British English conversation library (`ml/generate_conversations.py`): questions answered by members on the same topic, milestones congratulated, and open discussions. None of it comes from real people.
+On an empty database the simulator backfills 60 days of history through the real services, so moderation, tagging, events and fan-out all run. The history comes from a synthetic, British English conversation library (`ml/generate_conversations.py`): questions answered by members on the same topic, milestones congratulated, and open discussions. None of it comes from real people.
 
-Each simulated user has a main interest and one or two secondary interests. Even-numbered users read For You and odd-numbered users read Following, so the dashboard can compare the two. Settings are in `src/FeedFabric.Simulator/appsettings.json`.
+Each simulated user has a main interest and one or two secondary interests. Then it stops. With `Simulator:Live` set to `true` it keeps going, posting and reading every second; that runs the safety models and ranks feeds nonstop, so expect it to keep a laptop busy. Even-numbered users read For You and odd-numbered users read Following, so the dashboard can compare the two. Settings are in `src/FeedFabric.Simulator/appsettings.json`.
 
 ## Docs
 

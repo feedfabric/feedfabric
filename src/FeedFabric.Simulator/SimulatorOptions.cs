@@ -17,6 +17,10 @@ public class SimulatorOptions
     // Zipf exponent for who gets followed: higher means a few accounts get most of the followers
     public double PopularityExponent { get; set; } = 1.0;
 
+    // After the backfill, keep posting and reading every TickInterval. Off by default: the backfill alone makes a
+    // platform to demo, and the live loop runs every safety check and ranks feeds nonstop, which is heavy on a laptop.
+    public bool Live { get; set; }
+
     public TimeSpan TickInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     public int PostsPerTick { get; set; } = 5;
@@ -65,9 +69,9 @@ public class SimulatorOptions
     public double PostMentionChance { get; set; } = 0.05;
 
     // On an empty platform, days of history to create first from the conversation library, and how much per day
-    public int BackfillDays { get; set; } = 14;
+    public int BackfillDays { get; set; } = 60;
 
-    public int BackfillThreadsPerDay { get; set; } = 140;
+    public int BackfillThreadsPerDay { get; set; } = 150;
 
     public int BackfillMinLikes { get; set; } = 2;
 

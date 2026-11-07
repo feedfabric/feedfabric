@@ -4,7 +4,7 @@ export ConnectionStrings__Default = Host=localhost;Port=$(POSTGRES_PORT);Databas
 
 EF = dotnet ef --project src/FeedFabric.Application --startup-project src/FeedFabric.Api
 
-.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop migrate migration admin admin-build openapi docs fabric train tune-toxicity models
+.PHONY: up down down-all logs logs-worker watch psql redis run run-worker simulate simulate-stop backfill migrate migration admin admin-build openapi docs fabric train tune-toxicity models
 
 up:
 	docker compose up -d --build
@@ -39,7 +39,13 @@ run:
 run-worker:
 	dotnet run --project src/FeedFabric.Worker.Events
 
-# Seeds simulated users and follows, then posts every tick; settings in src/FeedFabric.Simulator/appsettings.json
+# Demo data on a fresh database: seeds simulated users and follows and backfills BackfillDays of conversations, likes
+# and comments, then stops. Runs on the host, where make models put the safety models, at low priority so the machine
+# stays usable. Does nothing to a database that already has posts. Settings in src/FeedFabric.Simulator/appsettings.json.
+backfill:
+	DOTNET_ENVIRONMENT=Development nice -n 15 dotnet run --project src/FeedFabric.Simulator
+
+# The simulator in Docker; add Simulator__Live=true to keep it posting every tick after the backfill
 simulate:
 	docker compose --profile sim up -d --build simulator
 	docker compose logs -f simulator

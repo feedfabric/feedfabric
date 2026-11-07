@@ -12,14 +12,15 @@ using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Simulator;
 
-// Seeds simulated users and a follow graph where a few accounts have most of the followers,
-// then on every tick creates posts and has some users read their home feed and like posts, through the same
-// services the API uses.
+// Seeds simulated users and a follow graph where a few accounts have most of the followers, backfills history on an
+// empty platform, then stops. With Live on, it carries on: every tick it creates posts and has some users read their
+// home feed and like posts, through the same services the API uses.
 public class Simulation(
     IServiceScopeFactory scopeFactory,
     Backfill backfill,
     IOptions<SimulatorOptions> options,
     TimeProvider timeProvider,
+    IHostApplicationLifetime lifetime,
     ILogger<Simulation> logger) : BackgroundService
 {
     public const string UserPrefix = "sim-";
@@ -31,6 +32,12 @@ public class Simulation(
         var random = new Random(settings.Seed);
         var authors = await SeedAsync(settings, random, stoppingToken);
         await backfill.RunAsync(authors.Count, random, stoppingToken);
+        if (!settings.Live)
+        {
+            logger.LogInformation("Live simulation is off (Simulator:Live=false); stopping");
+            lifetime.StopApplication();
+            return;
+        }
 
         using var timer = new PeriodicTimer(settings.TickInterval, timeProvider);
         var tick = 0;
