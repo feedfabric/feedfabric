@@ -11,8 +11,9 @@
     // Unknown paths get dist/404.html with a 404 status
     "not_found_handling": "404-page"
   },
-  // Served on <name>.<your-subdomain>.workers.dev. For your own domain, add it under "routes", e.g.
-  // "routes": [{ "pattern": "docs.example.org", "custom_domain": true }]
+  // Served on docs.feedfabric.dev (Cloudflare creates the DNS record and certificate on deploy; the feedfabric.dev
+  // zone must be on the same account), and on <name>.<your-subdomain>.workers.dev
+  "routes": [{ "pattern": "docs.feedfabric.dev", "zone_name": "feedfabric.dev", "custom_domain": true }],
   "workers_dev": true,
   "preview_urls": true
 }
