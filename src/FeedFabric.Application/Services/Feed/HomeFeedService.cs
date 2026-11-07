@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Users;
@@ -17,7 +16,6 @@ public class HomeFeedService(
     IMediaService media,
     FeatureBuilder features,
     FeedLog feedLog,
-    IOptions<FeedOptions> options,
     ILogger<HomeFeedService> logger) : IHomeFeedService
 {
     private const string Redis = "redis";
@@ -57,12 +55,17 @@ public class HomeFeedService(
         {
             (posts, var exhausted) = await FromRedisAsync(userId, query.Cursor, want, cancellationToken);
             source = Redis;
-            // Redis only holds the newest MaxLength entries; older pages continue from Postgres
-            if (exhausted && posts.Count < want && await IsTimelineFullAsync(userId))
+            // Older pages continue from Postgres: Redis holds only the newest MaxLength entries, and a timeline that was
+            // lost or cleared (docs/runbooks.md) is rebuilt by fan-out with new posts only
+            if (exhausted && posts.Count < want)
             {
                 var before = posts.Count > 0 ? posts[^1].Id : query.Cursor;
-                posts.AddRange(await FromPostgresAsync(userId, before, want - posts.Count, cancellationToken));
-                source = posts.Count > 0 ? $"{Redis}+{Postgres}" : Postgres;
+                var older = await FromPostgresAsync(userId, before, want - posts.Count, cancellationToken);
+                if (older.Count > 0)
+                {
+                    source = posts.Count > 0 ? $"{Redis}+{Postgres}" : Postgres;
+                    posts.AddRange(older);
+                }
             }
         }
         catch (Exception ex) when (ex is RedisException or TimelineMissException)
@@ -128,9 +131,6 @@ public class HomeFeedService(
         }
         return (posts, false);
     }
-
-    private async Task<bool> IsTimelineFullAsync(Guid userId) =>
-        await redis.GetDatabase().SortedSetLengthAsync(FeedKeys.ForUser(userId)) >= options.Value.MaxLength;
 
     // Posts in the given order, skipping any that are deleted, missing or held (unless they're the viewer's own), and
     // reposts of those

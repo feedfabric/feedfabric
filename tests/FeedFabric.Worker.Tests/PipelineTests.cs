@@ -55,6 +55,36 @@ public class PipelineTests(PipelineFixture pipeline)
     }
 
     [Fact]
+    public async Task A_timeline_rebuilt_by_fan_out_still_reaches_older_posts()
+    {
+        Assert.SkipUnless(PipelineFixture.ModelsPresent, "Needs the moderation models (make models)");
+        var author = await pipeline.UserAsync("author");
+        var follower = await pipeline.UserAsync("follower");
+        using (var scope = pipeline.Api.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Follows.Add(new FollowEntity { FollowerId = follower.Id, FolloweeId = author.Id, CreatedAt = DateTime.UtcNow });
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        var redis = pipeline.Api.GetRequiredService<IConnectionMultiplexer>().GetDatabase();
+        var timeline = FeedKeys.ForUser(follower.Id);
+
+        var older = await PostAsync(author, "Ten miles on the canal path today");
+        await PipelineFixture.EventuallyAsync(async () => await redis.SortedSetScoreAsync(timeline, older.ToString()) is not null, "the fan-out");
+        // Redis lost the timeline (a flush, or a restart without persistence); the next post's fan-out starts a new one
+        await redis.KeyDeleteAsync(timeline);
+        var newer = await PostAsync(author, "Rest day, then hills tomorrow");
+        await PipelineFixture.EventuallyAsync(async () => await redis.SortedSetScoreAsync(timeline, newer.ToString()) is not null, "the fan-out");
+
+        using var feedScope = pipeline.Api.CreateScope();
+        var feed = await feedScope.ServiceProvider.GetRequiredService<IHomeFeedService>()
+            .GetHomeFeedAsync(follower.ExternalUserId, new HomeFeedQuery(), TestContext.Current.CancellationToken);
+        Assert.NotNull(feed);
+        Assert.Equal([newer, older], feed.Posts.Select(p => p.Id));
+        Assert.Equal("redis+postgres", feed.Source);
+    }
+
+    [Fact]
     public async Task Likes_and_comments_reach_the_signals_the_ranker_reads()
     {
         Assert.SkipUnless(PipelineFixture.ModelsPresent, "Needs the moderation models (make models)");
