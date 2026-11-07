@@ -184,34 +184,34 @@ public sealed class RankerModel(IBlobStorage storage, IOptions<RankingOptions> o
 // models/ranker/latest.json, written by ml/train_ranker.py
 public sealed class RankerModelInfo
 {
-    public required string Version { get; set; }
+    public required string Version { get; init; }
 
     // A single-prediction model; newer models list Heads instead
-    public string? ModelKey { get; set; }
+    public string? ModelKey { get; init; }
 
     // Each prediction's model: "open", "like", "comment", "long_dwell", "skip" → models/ranker/<version>-<head>.onnx
-    public Dictionary<string, string>? Heads { get; set; }
+    public Dictionary<string, string>? Heads { get; init; }
 
     // What each prediction is worth when adding them up into one score; negative for things to avoid
-    public Dictionary<string, double> Weights { get; set; } = [];
+    public Dictionary<string, double> Weights { get; init; } = [];
 
-    public required string[] Features { get; set; }
+    public required string[] Features { get; init; }
 
-    public DateTime TrainedAt { get; set; }
+    public DateTime TrainedAt { get; init; }
 
-    public int TrainingRows { get; set; }
+    public int TrainingRows { get; init; }
 
-    public double PositiveRate { get; set; }
+    public double PositiveRate { get; init; }
 
     // Whose behaviour it learned from: "real" members, "synthetic" (the simulator) or "all"
-    public string? Source { get; set; }
+    public string? Source { get; init; }
 
     // Each head's file (by key) to its SHA-256, checked on load; missing on models published before checksums
-    public Dictionary<string, string>? Sha256 { get; set; }
+    public Dictionary<string, string>? Sha256 { get; init; }
 
     // Per head ("auc_like"…), and for the combined score ("value_ndcg_at_10") against the formula ("heuristic_value_ndcg_at_10")
-    public Dictionary<string, double> Metrics { get; set; } = [];
+    public Dictionary<string, double> Metrics { get; init; } = [];
 
     // How much each signal contributes to the model's splits (LightGBM "gain"), normalised to sum to 1
-    public Dictionary<string, double> Importance { get; set; } = [];
+    public Dictionary<string, double> Importance { get; init; } = [];
 }

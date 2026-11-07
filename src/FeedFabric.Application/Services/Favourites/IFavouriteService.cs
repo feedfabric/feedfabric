@@ -33,5 +33,5 @@ public class FavouriteResponse
 
     public string? AvatarUrl { get; set; }
 
-    public DateTime AddedAt { get; set; }
+    public DateTime AddedAt { get; init; }
 }

@@ -15,7 +15,7 @@ public class TagService(AppDbContext db, IMediaService media, TimeProvider timeP
             && db.PostTags.Any(t => t.PostId == p.Id && t.Tag == normalized));
         if (query.Cursor is { } cursor)
         {
-            posts = posts.Where(p => p.Id.CompareTo(cursor) < 0);
+            posts = posts.Where(p => p.Id < cursor);
         }
 
         // One extra row tells us whether there is another page

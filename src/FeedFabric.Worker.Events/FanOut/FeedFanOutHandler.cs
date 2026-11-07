@@ -40,7 +40,7 @@ public class FeedFanOutHandler(
             var followers = db.Follows.AsNoTracking().Where(f => f.FolloweeId == post.AuthorId);
             if (after is { } last)
             {
-                followers = followers.Where(f => f.FollowerId.CompareTo(last) > 0);
+                followers = followers.Where(f => f.FollowerId > last);
             }
 
             var followerIds = await followers

@@ -20,27 +20,27 @@ public class FeedService(AppDbContext db) : IFeedService
 
         if (query.Gt is { } gt)
         {
-            posts = posts.Where(p => p.Id.CompareTo(gt) > 0);
+            posts = posts.Where(p => p.Id > gt);
         }
         if (query.Gte is { } gte)
         {
-            posts = posts.Where(p => p.Id.CompareTo(gte) >= 0);
+            posts = posts.Where(p => p.Id >= gte);
         }
         if (query.Lt is { } lt)
         {
-            posts = posts.Where(p => p.Id.CompareTo(lt) < 0);
+            posts = posts.Where(p => p.Id < lt);
         }
         if (query.Lte is { } lte)
         {
-            posts = posts.Where(p => p.Id.CompareTo(lte) <= 0);
+            posts = posts.Where(p => p.Id <= lte);
         }
 
         var newestFirst = query.Order == FeedOrder.Newest;
         if (query.Cursor is { } cursor)
         {
             posts = newestFirst
-                ? posts.Where(p => p.Id.CompareTo(cursor) < 0)
-                : posts.Where(p => p.Id.CompareTo(cursor) > 0);
+                ? posts.Where(p => p.Id < cursor)
+                : posts.Where(p => p.Id > cursor);
         }
 
         posts = newestFirst ? posts.OrderByDescending(p => p.Id) : posts.OrderBy(p => p.Id);

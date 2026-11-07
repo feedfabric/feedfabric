@@ -141,7 +141,7 @@ public class CommentService(AppDbContext db, FeedLog feedLog, TextModerator mode
             && ((c.DeletedAt == null && c.Status != ContentStatus.Removed) || db.Comments.Any(r => r.ParentCommentId == c.Id)));
         if (query.Cursor is { } cursor)
         {
-            comments = comments.Where(c => c.Id.CompareTo(cursor) > 0);
+            comments = comments.Where(c => c.Id > cursor);
         }
 
         // One extra row tells us whether there is another page

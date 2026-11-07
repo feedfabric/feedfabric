@@ -64,7 +64,7 @@ public class LikeService(AppDbContext db, FeedLog feedLog, TimeProvider timeProv
         var userId = await db.Users.FindIdByExternalIdAsync(externalUserId, cancellationToken);
         if (userId is null)
         {
-            return (LikeResultStatus.UserNotFound, default, default);
+            return (LikeResultStatus.UserNotFound, Guid.Empty, Guid.Empty);
         }
 
         // Only posts the user can see: visible ones, and their own held ones
@@ -74,7 +74,7 @@ public class LikeService(AppDbContext db, FeedLog feedLog, TimeProvider timeProv
             .Select(p => (Guid?)p.AuthorId)
             .SingleOrDefaultAsync(cancellationToken);
         return authorId is null
-            ? (LikeResultStatus.PostNotFound, default, default)
+            ? (LikeResultStatus.PostNotFound, Guid.Empty, default)
             : (LikeResultStatus.Ok, userId.Value, authorId.Value);
     }
 }

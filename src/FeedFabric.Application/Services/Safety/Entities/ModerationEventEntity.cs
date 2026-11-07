@@ -1,0 +1,129 @@
+using FeedFabric.Application.Services;
+
+namespace FeedFabric.Application.Services.Safety;
+
+// Something moderation acted on: a post, comment or photo that was blocked, held for review, or reported enough to be
+// held. Kept so the dashboard can show what is being caught, so repeat offenders can be found, and, once a reviewer
+// has decided (Decision), as labelled examples for training the classifier.
+public class ModerationEventEntity : EntityBase
+{
+    // Whose post, comment or photo it was
+    public required Guid UserId { get; init; }
+
+    // ModerationActions
+    public string Action { get; init; } = ModerationActions.Blocked;
+
+    // "post", "comment", "photo", or "user" for a suspension or reinstatement
+    public required string Kind { get; init; }
+
+    // ModerationCategories
+    public required string Category { get; init; }
+
+    // The classifier's score for photos; 1 for rule matches
+    public double Score { get; init; }
+
+    // The start of the text that was stopped (never the photo itself, which is deleted)
+    public string? Excerpt { get; init; }
+
+    // What was held or reported; blocked things were never saved, so they have neither
+    public Guid? PostId { get; init; }
+
+    public Guid? CommentId { get; init; }
+
+    public DateTime CreatedAt { get; init; }
+
+    // Set when a reviewer decides: ReviewDecisions, and who (their external user ID)
+    public string? Decision { get; set; }
+
+    public string? ReviewedBy { get; set; }
+
+    public DateTime? ReviewedAt { get; set; }
+
+    public static string ExcerptOf(string text) => text.Length > 120 ? text[..117] + "…" : text;
+
+    // The classifier stopped or flagged a post or comment. Held and flagged ones keep what they're about, which puts them
+    // in the review queue; blocked ones were never saved.
+    public static ModerationEventEntity For(Guid userId, string kind, ModerationVerdict verdict, string text, Guid? postId, Guid? commentId,
+        DateTime at) => new()
+    {
+        UserId = userId,
+        Kind = kind,
+        Action = verdict.Action switch
+        {
+            ModerationAction.Block => ModerationActions.Blocked,
+            ModerationAction.Flag => ModerationActions.Flagged,
+            _ => ModerationActions.Held,
+        },
+        Category = verdict.Category,
+        Score = verdict.Score,
+        Excerpt = ExcerptOf(text),
+        PostId = verdict.Action != ModerationAction.Block ? postId : null,
+        CommentId = verdict.Action != ModerationAction.Block ? commentId : null,
+        CreatedAt = at,
+    };
+}
+
+public static class ModerationActions
+{
+    // Stopped when posted; nothing was saved
+    public const string Blocked = "blocked";
+
+    // Saved, but only the author sees it until a reviewer decides
+    public const string Held = "held";
+
+    // Enough people reported it that it was held
+    public const string Reported = "reported";
+
+    // Published as normal, and waiting for a reviewer to look at it
+    public const string Flagged = "flagged";
+
+    // A reviewer removed it without it having been flagged
+    public const string Reviewed = "reviewed";
+}
+
+public static class ReviewDecisions
+{
+    public const string Approved = "approved";
+    public const string Removed = "removed";
+
+    // On a Kind "user" event: the account's new status
+    public const string Suspended = "suspended";
+    public const string Reinstated = "reinstated";
+}
+
+public static class ModerationCategories
+{
+    public const string Nudity = "nudity";
+    public const string BlockedTerm = "blocked_term";
+    public const string LinkSpam = "link_spam";
+    public const string Flooding = "flooding";
+
+    // Held because enough people reported it
+    public const string Reported = "reported";
+
+    // Removed by a reviewer who found it themselves
+    public const string Manual = "manual";
+
+    // Staff suspended or reinstated the account (Kind "user")
+    public const string Suspended = "suspended";
+    public const string Reinstated = "reinstated";
+
+    // From the offensive-language classifier
+    public const string SevereToxicity = "severe_toxicity";
+    public const string Threat = "threat";
+    public const string Hate = "hate";
+    public const string Insult = "insult";
+    public const string Obscene = "obscene";
+    public const string SexuallyExplicit = "sexual_explicit";
+
+    public static string ForToxicityLabel(string label) => label switch
+    {
+        "severe_toxicity" => SevereToxicity,
+        "threat" => Threat,
+        "identity_attack" => Hate,
+        "insult" => Insult,
+        "obscene" => Obscene,
+        "sexual_explicit" => SexuallyExplicit,
+        _ => label,
+    };
+}

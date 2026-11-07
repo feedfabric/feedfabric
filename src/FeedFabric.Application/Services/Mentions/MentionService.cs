@@ -18,7 +18,7 @@ public class MentionService(AppDbContext db) : IMentionService
         var mentions = db.Mentions.AsNoTracking().Where(m => m.MentionedUserId == userId);
         if (query.Cursor is { } cursor)
         {
-            mentions = mentions.Where(m => m.Id.CompareTo(cursor) < 0);
+            mentions = mentions.Where(m => m.Id < cursor);
         }
 
         var page = await mentions
