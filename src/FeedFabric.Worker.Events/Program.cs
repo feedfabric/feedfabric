@@ -121,3 +121,4 @@ host.MapFeedFabricHealth();
 await KafkaTopics.EnsureCreatedAsync(kafkaOptions);
 await host.RunAsync();
 return 0;
+public partial class Program;
