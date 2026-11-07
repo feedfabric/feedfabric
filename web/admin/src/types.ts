@@ -183,7 +183,7 @@ export interface SystemInfo {
   models: SystemModel[]
   ranker: { loaded: boolean; version?: string; trainedAt?: string; trainingRows?: number }
   users: Record<string, number>
-  pipeline: { outboxWaiting: number; oldestWaitingSeconds: number | null; consumers: { consumer: string; lastProcessedAt: string }[] }
+  pipeline: { outboxWaiting: number; outboxParked: number; oldestWaitingSeconds: number | null; consumers: { consumer: string; lastProcessedAt: string }[] }
 }
 
 export interface Tag {
@@ -337,6 +337,7 @@ export interface Dashboard {
   }
   pipeline: {
     outboxWaiting: number
+    outboxParked: number
     oldestWaitingSeconds: number | null
     consumers: { consumer: string; lastProcessedAt: string }[]
   }

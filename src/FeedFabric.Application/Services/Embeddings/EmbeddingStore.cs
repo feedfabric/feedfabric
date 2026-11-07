@@ -50,6 +50,17 @@ public class EmbeddingStore(IConnectionMultiplexer redis)
         return entries.Select(e => (Guid.Parse(e.Element.ToString()), (long)e.Score)).ToList();
     }
 
+    // A deleted account's posts
+    public async Task RemoveAsync(IReadOnlyCollection<Guid> postIds)
+    {
+        var database = redis.GetDatabase();
+        foreach (var chunk in postIds.Chunk(500))
+        {
+            await database.KeyDeleteAsync(chunk.Select(id => (RedisKey)Key(id)).ToArray());
+            await database.SortedSetRemoveAsync(RecentKey, chunk.Select(id => (RedisValue)id.ToString()).ToArray());
+        }
+    }
+
     public async Task TrimAsync(DateTime olderThan) =>
         await redis.GetDatabase().SortedSetRemoveRangeByScoreAsync(RecentKey, double.NegativeInfinity,
             new DateTimeOffset(olderThan, TimeSpan.Zero).ToUnixTimeMilliseconds());

@@ -46,6 +46,7 @@ public class ImpressionService(AppDbContext db, IConnectionMultiplexer redis, Fe
         {
             writes.Add(batch.SortedSetIncrementAsync(ImpressionKeys.PostTotals, id.ToString(), 1));
             writes.Add(batch.HyperLogLogAddAsync(ImpressionKeys.Viewers(id), viewerId.Value.ToString()));
+            writes.Add(batch.KeyExpireAsync(ImpressionKeys.Viewers(id), ImpressionKeys.PostSignalLifetime));
         }
         writes.Add(batch.StringIncrementAsync(minute, fresh.Count));
         writes.Add(batch.KeyExpireAsync(minute, MinuteLifetime));
@@ -115,6 +116,7 @@ public class ImpressionService(AppDbContext db, IConnectionMultiplexer redis, Fe
                 writes.Add(batch.HashIncrementAsync(key, "n", 1));
                 writes.Add(batch.HashIncrementAsync(key, bucket, 1));
             }
+            writes.Add(batch.KeyExpireAsync(ImpressionKeys.PostDwell(postId), ImpressionKeys.PostSignalLifetime));
         }
         writes.Add(batch.KeyExpireAsync(minute, MinuteLifetime));
         batch.Execute();

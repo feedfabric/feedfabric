@@ -1,7 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Impressions;
 using FeedFabric.Application.Services.Ranking;
@@ -10,6 +12,7 @@ using FeedFabric.Application.Services.Users;
 namespace FeedFabric.Api.Controllers;
 
 [ApiController]
+[EnableRateLimiting(RateLimitPolicies.Signals)]
 [Authorize]
 [Route("userfeed")]
 public class ImpressionsController(IImpressionService impressionService, ForYouService forYou, ICurrentUser currentUser) : ControllerBase

@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text.Json;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
@@ -13,7 +14,8 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
 {
     public const int Dimensions = 384;
     private const int MaxTokens = 128;
-    private const string Prefix = "models/embeddings/minilm";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/embeddings/minilm";
 
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
@@ -152,15 +154,13 @@ public sealed class TextEmbedder(IBlobStorage storage) : IDisposable
         {
             if (session is null || tokenizer is null)
             {
-                await using var vocab = await storage.GetAsync($"{Prefix}/vocab.txt", cancellationToken)
-                    ?? throw new InvalidOperationException($"No embedding model at {Prefix}: run make models.");
-                await using var modelFile = await storage.GetAsync($"{Prefix}/model.onnx", cancellationToken)
-                    ?? throw new InvalidOperationException($"No embedding model at {Prefix}: run make models.");
-                using var vocabCopy = new MemoryStream();
-                await vocab.Content.CopyToAsync(vocabCopy, cancellationToken);
-                vocabCopy.Position = 0;
-                using var bytes = new MemoryStream();
-                await modelFile.Content.CopyToAsync(bytes, cancellationToken);
+                await using var metaFile = await storage.GetAsync($"{Prefix}/meta.json", cancellationToken)
+                    ?? throw new ModelNotFoundException($"No embedding model at {Prefix}: run make models.");
+                using var meta = await JsonDocument.ParseAsync(metaFile.Content, cancellationToken: cancellationToken);
+                using var vocabCopy = await ModelFiles.ReadAsync(storage, $"{Prefix}/vocab.txt",
+                    ModelFiles.Checksum(meta.RootElement, "vocab.txt"), "embedding vocabulary", cancellationToken);
+                using var bytes = await ModelFiles.ReadAsync(storage, $"{Prefix}/model.onnx",
+                    ModelFiles.Checksum(meta.RootElement, "model.onnx"), "embedding model", cancellationToken);
                 tokenizer = BertTokenizer.Create(vocabCopy, new BertOptions { LowerCaseBeforeTokenization = true });
                 session = new InferenceSession(bytes.ToArray());
             }

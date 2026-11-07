@@ -13,7 +13,14 @@ public static class ErrorCodes
     public const string MethodNotAllowed = "method_not_allowed";
     public const string Conflict = "conflict";
     public const string UnsupportedMediaType = "unsupported_media_type";
+    // Over the request body limit (Kestrel:Limits:MaxRequestBodySize)
+    public const string RequestTooLarge = "request_too_large";
+    // Too many requests of one kind in a short time (RateLimits); params: { retryAfterSeconds }, also in Retry-After
+    public const string RateLimited = "rate_limited";
     public const string InternalError = "internal_error";
+
+    // Postgres, Redis or blob storage is unreachable for now; Retry-After says when to try again
+    public const string ServiceUnavailable = "service_unavailable";
 
     // Users and posts
     public const string UserNotSynced = "user.not_synced";
@@ -60,5 +67,7 @@ public static class ErrorCodes
     // Validation attributes put them in ErrorMessage, with params as ";name={n}" placeholders.
     public const string Required = "required";
     public const string OutOfRange = "out_of_range";
+    // Longer than allowed; params: { max } characters
+    public const string TooLong = "too_long";
     public const string InvalidValue = "invalid_value";
 }

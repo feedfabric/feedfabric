@@ -1,5 +1,6 @@
-# Builds and tests everything on each pull request. On main and version tags it also publishes the API and worker
-# images to GitHub Container Registry: ghcr.io/<owner>/<repo>/api and .../worker-events.
+# Builds and tests everything on each pull request. On main and version tags it also publishes the API, worker and
+# migrations images to GitHub Container Registry: ghcr.io/<owner>/<repo>/api, .../worker-events and .../migrations.
+# Actions are pinned to commit SHAs, since a tag can be moved to other code; Dependabot keeps them current.
 name: CI
 
 on:
@@ -34,9 +35,9 @@ jobs:
           --health-timeout 3s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 10.0.x
 
@@ -44,7 +45,7 @@ jobs:
       # The fine-tuned toxicity model isn't here: tests that need it are skipped (Models.SkipUnlessTuned).
       - name: Cache models
         id: models
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .blobs/models
           key: models-${{ hashFiles('ml/fetch_models.py') }}
@@ -55,6 +56,13 @@ jobs:
 
       - run: dotnet build --configuration Release
 
+      # Fails when an entity changed without a migration, which would leave the bundle out of step with the model
+      - name: Check migrations match the model
+        run: |
+          dotnet tool restore
+          dotnet ef migrations has-pending-model-changes --project src/FeedFabric.Application --startup-project src/FeedFabric.Application
+
+      # Includes FeedFabric.Api.Tests and FeedFabric.Worker.Tests, which start Postgres, Redis and Kafka with Testcontainers
       - run: dotnet test --configuration Release --no-build
 
   admin:
@@ -64,9 +72,9 @@ jobs:
       run:
         working-directory: web/admin
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -84,9 +92,9 @@ jobs:
       run:
         working-directory: web/fabric-ui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -113,14 +121,17 @@ jobs:
             dockerfile: src/FeedFabric.Api/Dockerfile
           - image: worker-events
             dockerfile: src/FeedFabric.Worker.Events/Dockerfile
+          # The EF migration bundle, run as a one-off container before the API rolls out (docs/deploying.md)
+          - image: migrations
+            dockerfile: src/FeedFabric.Application/Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -128,7 +139,7 @@ jobs:
 
       # main: latest and sha-<short>; a tag v1.2.3: 1.2.3 and 1.2
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.image }}
           tags: |
@@ -137,12 +148,31 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      # Pull requests build the image to prove it builds, without pushing it
-      - uses: docker/build-push-action@v6
+      # Built into the local Docker first, so it can be scanned before anything is pushed
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
+          load: true
+          tags: scan/${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+      # Fails on a fixable critical or high vulnerability in the OS packages or the .NET dependencies. 0.35.0 or
+      # later only: earlier tags were rewritten in the March 2026 supply-chain compromise (CVE-2026-33634).
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: scan/${{ matrix.image }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # Pull requests build and scan the image to prove it's fine, without pushing it
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image }}

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Users;
@@ -14,6 +16,7 @@ namespace FeedFabric.Api.Controllers;
 [Route("media")]
 public class MediaController(IMediaService mediaService, ICurrentUser currentUser) : ControllerBase
 {
+    [EnableRateLimiting(RateLimitPolicies.Uploads)]
     [HttpPost("uploads")]
     public async Task<ActionResult<UploadResponse>> CreateUpload(CreateUploadRequest request, CancellationToken cancellationToken)
     {
@@ -21,6 +24,7 @@ public class MediaController(IMediaService mediaService, ICurrentUser currentUse
         return result.Status == MediaResultStatus.Ok ? StatusCode(StatusCodes.Status201Created, result.Value) : ToProblem(result.Status);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Uploads)]
     [HttpPost("{id:guid}/complete")]
     public async Task<ActionResult<MediaResponse>> Complete(Guid id, CancellationToken cancellationToken)
     {

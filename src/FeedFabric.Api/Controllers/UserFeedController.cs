@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Feed;
@@ -57,6 +59,7 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
         return feed is null ? ToProblem(PostResultStatus.UserNotFound) : Ok(feed);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Posting)]
     [HttpPost("posts")]
     public async Task<ActionResult<PostResponse>> CreatePost(PostRequest request, CancellationToken cancellationToken)
     {
@@ -66,6 +69,7 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
             : ToProblem(result.Status, result.Violation);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Posting)]
     [HttpPut("posts/{id:guid}")]
     public async Task<ActionResult<PostResponse>> EditPost(Guid id, PostRequest request, CancellationToken cancellationToken)
     {
@@ -73,6 +77,7 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
         return result.Status == PostResultStatus.Ok ? Ok(result.Post) : ToProblem(result.Status, result.Violation);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Posting)]
     [HttpDelete("posts/{id:guid}")]
     public async Task<IActionResult> DeletePost(Guid id, CancellationToken cancellationToken)
     {

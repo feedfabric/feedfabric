@@ -12,7 +12,7 @@ public static class Topics
 
     public static string ForEventType(string type) => type switch
     {
-        EventTypes.PostCreated or EventTypes.PostUpdated => Posts,
+        EventTypes.PostCreated or EventTypes.PostUpdated or EventTypes.UserDeleted => Posts,
         EventTypes.PostLiked or EventTypes.PostUnliked or EventTypes.CommentCreated or EventTypes.CommentDeleted
             or EventTypes.UserMentioned => Engagement,
         EventTypes.MediaUploaded => Media,

@@ -49,6 +49,12 @@ public class S3BlobStorageOptions
     // Path-style URLs (host/bucket/key); most S3-compatible services need this
     public bool ForcePathStyle { get; set; }
 
+    // Per request, including the SDK's own retries of throttling, 5xx and network errors (MaxRetries of them, with
+    // backoff). Uploads go straight to S3 from clients, so these are small reads, writes and deletes.
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    public int MaxRetries { get; set; } = 4;
+
     // Create the bucket on startup if it's missing. For local emulators; production buckets are provisioned separately.
     public bool CreateBucket { get; set; }
 }

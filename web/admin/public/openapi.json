@@ -6,7 +6,7 @@
   },
   "servers": [
     {
-      "url": "http://localhost:5162/"
+      "url": "http://localhost:5199/"
     }
   ],
   "paths": {
@@ -145,27 +145,26 @@
             }
           }
         }
-      }
-    },
-    "/weatherforecast": {
-      "get": {
+      },
+      "delete": {
         "tags": [
-          "FeedFabric.Api"
+          "Account"
         ],
-        "operationId": "GetWeatherForecast",
         "responses": {
           "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/WeatherForecast"
-                  }
-                }
-              }
-            }
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/me/export": {
+      "get": {
+        "tags": [
+          "Account"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -813,6 +812,26 @@
     },
     "/admin/users/{externalUserId}": {
       "get": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "parameters": [
+          {
+            "name": "externalUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
         "tags": [
           "AdminUsers"
         ],
@@ -2890,6 +2909,7 @@
         "type": "object",
         "properties": {
           "content": {
+            "maxLength": 2000,
             "type": "string"
           },
           "parentCommentId": {
@@ -3695,6 +3715,7 @@
         "type": "object",
         "properties": {
           "content": {
+            "maxLength": 5000,
             "type": "string"
           },
           "mediaIds": {
@@ -4233,48 +4254,15 @@
             "format": "double"
           }
         }
-      },
-      "WeatherForecast": {
-        "required": [
-          "date",
-          "temperatureC",
-          "summary"
-        ],
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "temperatureC": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "summary": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "temperatureF": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          }
-        }
       }
     }
   },
   "tags": [
     {
       "name": "FeedFabric.Api"
+    },
+    {
+      "name": "Account"
     },
     {
       "name": "Admin"

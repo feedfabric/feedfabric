@@ -25,6 +25,7 @@ with models/ranker/latest.json listing the heads and weights. The API checks for
 """
 
 import argparse
+import hashlib
 import io
 import warnings
 import json
@@ -201,6 +202,8 @@ def main() -> None:
         "positiveRate": round(float((data["open"] | data["like"] | data["comment"]).mean()), 4),
         "exploredShare": round(float(data["explored"].mean()), 4),
         "source": args.source,
+        # Checked by the API before it loads a head, so a half-copied or damaged file is never served
+        "sha256": {key: hashlib.sha256(data).hexdigest() for key, data in files.items()},
         "metrics": metrics,
         "importance": importance,
     }

@@ -1,15 +1,22 @@
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using FeedFabric.Api.Auth;
 using FeedFabric.Api.Admin;
 using FeedFabric.Api.Dev;
 using FeedFabric.Api.Storage;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.Hosting;
+using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Feed;
+using FeedFabric.Application.Services.Health;
 using FeedFabric.Application.Services.Impressions;
 using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Follows;
@@ -26,9 +33,26 @@ using FeedFabric.Application.Services.Scanning;
 using FeedFabric.Application.Services.Storage;
 using FeedFabric.Application.Services.Tags;
 using FeedFabric.Application.Services.Users;
+using FeedFabric.Hosting;
 using StackExchange.Redis;
 
+// Docker HEALTHCHECK: see HealthEndpoints.ProbeAsync
+if (args is ["healthcheck", ..])
+{
+    return await HealthEndpoints.ProbeAsync();
+}
+
 var builder = WebApplication.CreateBuilder(args);
+StartupChecks.Validate(builder.Configuration, builder.Environment.IsDevelopment(), "ConnectionStrings:Redis");
+builder.AddFeedFabricTelemetry("feedfabric-api", [], []);
+
+// How long in-flight requests get to finish on SIGTERM; keep the orchestrator's grace period longer than this
+builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = builder.Configuration.GetValue("ShutdownTimeout", TimeSpan.FromSeconds(25)));
+
+// Kestrel:Limits, e.g. MaxRequestBodySize (1 MB in appsettings.json; uploads go to signed URLs, not through here)
+builder.Services.Configure<KestrelServerOptions>(builder.Configuration.GetSection("Kestrel"));
+// No "Server: Kestrel" on responses
+builder.Services.PostConfigure<KestrelServerOptions>(options => options.AddServerHeader = false);
 
 // Add services to the container.
 // Pooled: contexts are reset and reused across requests instead of being built for each one
@@ -81,6 +105,7 @@ builder.Services.AddSingleton<TextModerator>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<AdminPostService>();
 builder.Services.AddScoped<EmbeddingStore>();
 // The last day's post embeddings in memory, for meaning-based candidates
@@ -91,8 +116,30 @@ builder.Services.AddFeedFabricAuth(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorizationBuilder().AddRankingPolicies(builder.Environment).AddModerationPolicies(builder.Environment)
     .AddAdminPolicies(builder.Environment);
 builder.Services.AddHttpContextAccessor();
+// Behind a TLS-terminating proxy (ProxyOptions)
+var proxy = builder.Configuration.GetSection(ProxyOptions.Section).Get<ProxyOptions>() ?? new ProxyOptions();
+builder.Services.Configure<ForwardedHeadersOptions>(proxy.ApplyTo);
+builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+// Browsers on these origins (the admin panel, a web front end) may call the API. Tokens go in the Authorization
+// header, not cookies, so credentials aren't allowed. Empty: no CORS headers, serve front ends from the API's origin.
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(corsOrigins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .WithExposedHeaders("Retry-After")
+    .SetPreflightMaxAge(TimeSpan.FromHours(1))));
+// /health/live and /health/ready. Without Redis the API still serves (feeds fall back to Postgres), so it only
+// degrades readiness; without the toxicity model nothing can be posted.
+builder.Services.AddHealthChecks()
+    .AddPostgres()
+    .AddRedis(HealthStatus.Degraded)
+    .AddModels(HealthStatus.Unhealthy, ToxicityClassifier.Prefix);
+// Per-user limits on writes, signals and previews (RateLimitOptions)
+builder.Services.AddFeedFabricRateLimiting(builder.Configuration);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 // Every error, including auth, routing and unhandled exceptions, is Problem Details with a "code"
+builder.Services.AddExceptionHandler<DependencyDownHandler>();
 builder.Services.AddProblemDetails(options =>
     options.CustomizeProblemDetails = context =>
         context.ProblemDetails.Extensions.TryAdd("code", ProblemResults.CodeForStatus(context.ProblemDetails.Status)));
@@ -121,9 +168,27 @@ if (app.Environment.IsDevelopment())
     await TagBackfill.RunAsync(db, app.Logger);
 }
 
+if (!app.Environment.IsDevelopment() && app.Configuration["AllowedHosts"] is null or "*")
+{
+    app.Logger.LogWarning("AllowedHosts is \"*\": set it to the API's host names so requests for other hosts are refused");
+}
+
 // Configure the HTTP request pipeline.
-app.UseExceptionHandler();
+if (proxy.Enabled)
+{
+    app.UseForwardedHeaders();
+}
+app.UseMiddleware<SecurityHeaders>();
+// Kestrel's own refusals (a body over the limit is 413) keep their status rather than becoming a 500
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    StatusCodeSelector = exception => exception is Microsoft.AspNetCore.Http.BadHttpRequestException bad ? bad.StatusCode : StatusCodes.Status500InternalServerError,
+});
 app.UseStatusCodePages();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -133,15 +198,24 @@ if (app.Environment.IsDevelopment())
 // The admin panel's overview; the panel itself (web/admin) is a separate static site
 app.MapDashboardEndpoints();
 
-app.UseHttpsRedirection();
+// Not the health checks: probes call the container over plain HTTP
+app.UseWhen(http => !http.Request.Path.StartsWithSegments("/health"), branch => branch.UseHttpsRedirection());
+if (corsOrigins.Length > 0)
+{
+    app.UseCors();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
+// After authentication, so limits are counted per user
+app.UseRateLimiter();
 // A signed-in user's first request creates their FeedFabric user from the token
 app.UseMiddleware<UserProvisioning>();
 app.UseMiddleware<SuspendedUsers>();
+app.UseMiddleware<StaffAudit>();
 
 app.MapControllers();
+app.MapFeedFabricHealth();
 
 if (app.Services.GetService<LocalBlobStorage>() is not null)
 {
@@ -151,29 +225,6 @@ if (app.Services.GetService<LocalBlobStorage>() is not null)
 app.MapGet("/me", (ICurrentUser currentUser) => new { currentUser.ExternalUserId })
     .RequireAuthorization();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+await app.RunAsync();
+return 0;
+public partial class Program;

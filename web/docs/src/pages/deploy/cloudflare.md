@@ -70,8 +70,9 @@ pointing straight at the bucket.
 
 ## The admin panel and your front end
 
-Both are static sites that must reach the API **on their own origin**, because the API sends no CORS headers. On
-Cloudflare, a Worker serves the files and passes the API's paths through to your server:
+Both are static sites. The simplest setup has each reach the API **on its own origin**, so no CORS is involved (the
+alternative is listing their origins in `Cors__AllowedOrigins__0`, `__1`…). On Cloudflare, a Worker serves the files
+and passes the API's paths through to your server:
 
 ```js
 // worker.js: static files from ./dist, API paths to the FeedFabric server

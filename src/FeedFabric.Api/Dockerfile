@@ -2,6 +2,8 @@
 #   docker build -f src/FeedFabric.Api/Dockerfile -t feedfabric-api .
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# Security fixes Ubuntu has published since Microsoft last rebuilt the base image (CI's Trivy scan fails on them)
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -24,4 +26,6 @@ RUN dotnet publish "FeedFabric.Api.csproj" -c $BUILD_CONFIGURATION -o /app/publi
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# The images have no curl, so the app checks its own /health/live
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD ["dotnet", "FeedFabric.Api.dll", "healthcheck"]
 ENTRYPOINT ["dotnet", "FeedFabric.Api.dll"]

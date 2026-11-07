@@ -16,6 +16,7 @@ public sealed class IdentityClaims(IOptions<AuthOptions> options) : IClaimsTrans
     public const string DisplayName = "ff:name";
     public const string Avatar = "ff:avatar";
     public const string Role = "ff:role";
+    private const string Prefix = "ff:";
 
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
@@ -23,6 +24,16 @@ public sealed class IdentityClaims(IOptions<AuthOptions> options) : IClaimsTrans
         if (principal.Identities.Any(i => i.AuthenticationType == AuthenticationType) || principal.Identity?.IsAuthenticated != true)
         {
             return Task.FromResult(principal);
+        }
+
+        // FeedFabric's claims come only from here. A token that carries "ff:role" or "ff:user" itself (some providers
+        // let users or other apps put what they like in a token) must not be able to grant a role or name another user.
+        foreach (var tokenIdentity in principal.Identities)
+        {
+            foreach (var claim in tokenIdentity.Claims.Where(c => c.Type.StartsWith(Prefix, StringComparison.Ordinal)).ToList())
+            {
+                tokenIdentity.TryRemoveClaim(claim);
+            }
         }
 
         var claims = options.Value.Claims;

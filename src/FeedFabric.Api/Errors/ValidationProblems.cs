@@ -14,7 +14,7 @@ public record FieldError(
 // Replaces the default 400 so validation errors carry field codes instead of English sentences
 public static class ValidationProblems
 {
-    private static readonly HashSet<string> FieldCodes = [ErrorCodes.Required, ErrorCodes.OutOfRange, ErrorCodes.InvalidValue];
+    private static readonly HashSet<string> FieldCodes = [ErrorCodes.Required, ErrorCodes.OutOfRange, ErrorCodes.TooLong, ErrorCodes.InvalidValue];
 
     public static IActionResult Create(ActionContext context)
     {

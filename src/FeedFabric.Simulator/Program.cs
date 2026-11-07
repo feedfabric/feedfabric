@@ -30,6 +30,8 @@ builder.Services.AddScoped<FeedLog>();
 builder.Services.AddScoped<FeatureBuilder>();
 builder.Services.AddScoped<ForYouService>();
 builder.Services.Configure<RankingOptions>(builder.Configuration.GetSection(RankingOptions.Section));
+// Everything here is simulated, the ranker included
+builder.Services.PostConfigure<RankingOptions>(options => options.AllowSimulatedRanker = true);
 builder.Services.AddScoped<RankingProfileStore>();
 // The trained ranker, loaded from blob storage and checked for new versions once a minute
 builder.Services.AddSingleton<RankerModel>();

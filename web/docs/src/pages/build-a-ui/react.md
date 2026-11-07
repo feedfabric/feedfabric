@@ -145,7 +145,7 @@ cd app
 ```
 
 Proxy the member routes to the API in development, as in the Vue guide, so the app and API share an origin (the API
-sends no CORS headers):
+sends CORS headers only for origins in `Cors:AllowedOrigins`):
 
 ```ts
 // vite.config.ts

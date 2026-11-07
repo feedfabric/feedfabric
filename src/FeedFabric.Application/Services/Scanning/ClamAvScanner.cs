@@ -15,6 +15,24 @@ public class ClamAvScanner(IOptions<MalwareScanningOptions> options) : IMalwareS
     public async Task<ScanResult> ScanAsync(Stream content, CancellationToken cancellationToken)
     {
         var settings = options.Value.ClamAv;
+        var start = content.CanSeek ? content.Position : 0;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await ScanOnceAsync(content, cancellationToken);
+            }
+            catch (MalwareScanException ex) when (ex.InnerException is SocketException && content.CanSeek && attempt < settings.ConnectRetries)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1 << attempt), cancellationToken);
+                content.Position = start;
+            }
+        }
+    }
+
+    private async Task<ScanResult> ScanOnceAsync(Stream content, CancellationToken cancellationToken)
+    {
+        var settings = options.Value.ClamAv;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(settings.Timeout);
 
@@ -53,6 +71,25 @@ public class ClamAvScanner(IOptions<MalwareScanningOptions> options) : IMalwareS
         }
         // e.g. "INSTREAM size limit exceeded. ERROR": no verdict, so it isn't clean
         throw new MalwareScanException($"clamd didn't give a verdict: {reply}");
+    }
+
+    public async Task<bool> PingAsync(CancellationToken cancellationToken)
+    {
+        var settings = options.Value.ClamAv;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(settings.Host, settings.Port, timeout.Token);
+            await using var network = client.GetStream();
+            await network.WriteAsync("zPING\0"u8.ToArray(), timeout.Token);
+            return await ReadReplyAsync(network, timeout.Token) == "PONG";
+        }
+        catch (Exception ex) when (ex is SocketException or IOException or OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     private static async Task<string> ReadReplyAsync(NetworkStream network, CancellationToken cancellationToken)

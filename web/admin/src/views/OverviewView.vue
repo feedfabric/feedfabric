@@ -348,6 +348,7 @@ const consumerNames: Record<string, string> = { 'feed-fan-out': 'Feed fan-out', 
           <li>
             <span>Outbox</span>
             <span class="badge" :class="data.pipeline.outboxWaiting < 100 ? 'ok' : data.pipeline.outboxWaiting < 1000 ? 'warn' : 'bad'">{{ fmt(data.pipeline.outboxWaiting) }} waiting</span>
+            <span v-if="data.pipeline.outboxParked" class="badge bad">{{ fmt(data.pipeline.outboxParked) }} parked</span>
           </li>
           <li v-for="c in data.pipeline.consumers" :key="c.consumer">
             <span>{{ consumerNames[c.consumer] ?? c.consumer }}</span>

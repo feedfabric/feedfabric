@@ -13,7 +13,8 @@ namespace FeedFabric.Application.Services.Safety;
 // It reads meaning rather than words, so it catches abuse a word list misses: misspellings, "y0u", insults with no slur.
 public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
 {
-    private const string Prefix = "models/safety/toxicity";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/safety/toxicity";
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
     private CodeGenTokenizer? tokenizer;
@@ -66,14 +67,14 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
             if (session is null || tokenizer is null)
             {
                 await using var metaFile = await storage.GetAsync($"{Prefix}/meta.json", cancellationToken)
-                    ?? throw new InvalidOperationException($"No toxicity model at {Prefix}: run make models.");
+                    ?? throw new ModelNotFoundException($"No toxicity model at {Prefix}: run make models.");
                 using var meta = await JsonDocument.ParseAsync(metaFile.Content, cancellationToken: cancellationToken);
                 labels = meta.RootElement.GetProperty("labels").EnumerateArray().Select(l => l.GetString()!).ToArray();
                 maxTokens = meta.RootElement.GetProperty("maxTokens").GetInt32();
 
-                using var vocab = await ReadAsync("vocab.json", cancellationToken);
-                using var merges = await ReadAsync("merges.txt", cancellationToken);
-                using var bytes = await ReadAsync("model.onnx", cancellationToken);
+                using var vocab = await ReadAsync("vocab.json", meta.RootElement, cancellationToken);
+                using var merges = await ReadAsync("merges.txt", meta.RootElement, cancellationToken);
+                using var bytes = await ReadAsync("model.onnx", meta.RootElement, cancellationToken);
                 tokenizer = CodeGenTokenizer.Create(vocab, merges, addPrefixSpace: false, addBeginOfSentence: false, addEndOfSentence: false);
                 startId = tokenizer.Vocabulary["<s>"];
                 endId = tokenizer.Vocabulary["</s>"];
@@ -87,16 +88,9 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
         }
     }
 
-    // The whole file, since the tokenizer and ONNX Runtime both want a seekable stream or bytes
-    private async Task<MemoryStream> ReadAsync(string name, CancellationToken cancellationToken)
-    {
-        await using var file = await storage.GetAsync($"{Prefix}/{name}", cancellationToken)
-            ?? throw new InvalidOperationException($"No {name} for the toxicity model at {Prefix}: run make models.");
-        var copy = new MemoryStream();
-        await file.Content.CopyToAsync(copy, cancellationToken);
-        copy.Position = 0;
-        return copy;
-    }
+    // The whole file, since the tokenizer and ONNX Runtime both want a seekable stream or bytes, checked against meta.json
+    private Task<MemoryStream> ReadAsync(string name, JsonElement meta, CancellationToken cancellationToken) =>
+        ModelFiles.ReadAsync(storage, $"{Prefix}/{name}", ModelFiles.Checksum(meta, name), "toxicity model file", cancellationToken);
 
     public void Dispose()
     {

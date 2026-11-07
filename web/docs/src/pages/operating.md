@@ -1,11 +1,12 @@
 ---
 layout: ../layouts/Doc.astro
 title: Operating it
-description: The settings that matter when running FeedFabric for real, which service reads what, and what the production-readiness plan says is still to do.
+description: The settings that matter when running FeedFabric for real, which service reads what, how to deploy it, and what the production-readiness plan leaves open.
 ---
 
-The repository's `docs/configuration.md` lists every setting and environment variable, and
-`docs/production-readiness.md` the plan for running it for real members. This page is the short version.
+The repository's `docs/configuration.md` lists every setting and environment variable, `docs/deploying.md` how to
+deploy, `docs/runbooks.md` what to do when something needs a person, `docs/data-retention.md` what is kept and for how
+long, and `docs/production-readiness.md` where the production plan stands. This page is the short version.
 
 ## How settings are read
 
@@ -29,7 +30,11 @@ dev users on startup, and serves the OpenAPI document.
 | `MalwareScanning` | shown | ✓ | | `Enabled`, `ClamAv:Host`/`Port` |
 | `Feed` | ✓ | ✓ | ✓ | `MaxLength` 500 entries per timeline |
 | `Ranking` | ✓ | | ✓ | `DefaultProfile` `balanced` |
-| `Kafka` | | ✓ | | `BootstrapServers`, one consumer group per job, `Partitions` 3 |
+| `Kafka` | | ✓ | | `BootstrapServers`, one consumer group per job, `Partitions` 3, `ReplicationFactor` 3, `Security` for SASL/TLS |
+| `Outbox` | shown | ✓ | | `MaxPublishAttempts` 10, then a message is parked |
+| `Retention` | | ✓ | | How long the outbox, processed events, feed log (180 days), moderation events (a year) and media are kept |
+| `RateLimits` | ✓ | | | Per user per minute on writes and signals; `Account` 5 an hour |
+| `ForwardedHeaders`, `Cors` | ✓ | | | Behind a TLS proxy; `Cors:AllowedOrigins` for an admin panel on another origin |
 
 Settings more than one service reads must match in each: the API checks `Media:MaxUploadBytes` when it hands out an
 upload URL and the worker checks it again; the admin panel shows the API's `Moderation` and `MalwareScanning` values
@@ -50,7 +55,8 @@ From `docs/configuration.md`:
 - `Kafka:BootstrapServers`
 - `MalwareScanning:ClamAv:Host`, or `MalwareScanning:Enabled` `false`
 - `Moderation:BlockedTerms` (keep the real list out of the repository)
-- `AllowedHosts`
+- `AllowedHosts`, `ForwardedHeaders` behind a proxy, and `Cors:AllowedOrigins` if the admin panel has its own origin
+- `Kafka:Security` for managed Kafka
 - The safety models (`ml/fetch_models.py --s3-bucket …`, and the fine-tuned toxicity model) and a ranker trained on
   real members, in the bucket
 
@@ -62,36 +68,32 @@ your platform's secret store, passed in as environment variables.
 [Deploying FeedFabric](/deploy/) walks through a complete setup, and [Cloudflare](/deploy/cloudflare/) the parts
 that can run there. In brief:
 
-- **Images:** `src/FeedFabric.Api/Dockerfile` and `src/FeedFabric.Worker.Events/Dockerfile`, built from the repository
-  root. The API listens on 8080 in its container. The decided target is Docker, from images CI publishes to GHCR.
-- **Migrations:** only Development migrates on startup. Elsewhere run them as a deploy step before the API rolls out
-  (`make migrate` locally; an EF migration bundle in CI is the plan).
-- **Scaling:** API instances keep only caches in memory (the last day's post embeddings, the loaded ranker, users' status). Several
-  workers can run side by side: the outbox publisher uses `SKIP LOCKED`, and each consumer group shares its
-  partitions.
-- **Your front end:** the API sends no CORS headers, so serve it from the same origin as the API (or add a policy).
+- **Images:** CI publishes `api`, `worker-events` and `migrations` to GHCR, tagged `sha-<short>` (and `1.2.3` for a
+  release tag), after a Trivy scan. Deploy by tag, not `latest`. The API and the worker listen on 8080.
+- **Order:** run the `migrations` image to completion, then roll out the worker, then the API, each instance passing
+  `/health/ready` first. Only Development migrates on startup.
+- **Stopping:** both finish in-flight work within `ShutdownTimeout` (25 seconds); give containers 30 seconds to stop.
+- **Scaling:** API instances keep only caches in memory (the last day's post embeddings, the loaded ranker, users'
+  status). Several workers can run side by side: the outbox publisher uses `SKIP LOCKED`, each consumer group shares
+  its partitions, and the retention job runs in one at a time. Rate limits are counted per API instance.
+- **Your front end:** serve it from the API's origin, or list its origin in `Cors:AllowedOrigins`.
 - **The admin panel:** `make admin-build` writes a static site to `web/admin/dist`, to serve from anywhere that
   forwards `/admin`, `/ranking` and `/blobs` (and `/userfeed`, `/media` for its composer) to the API.
 
-## What the plan says is still to do
+## When something goes wrong
 
-`docs/production-readiness.md` tracks it in priority order. In brief:
+- **A dependency is down:** routes that need Postgres, Redis or blob storage answer `503` `service_unavailable` with
+  `Retry-After`. The home feed reads Postgres when Redis is down, and the worker retries until the dependency is back.
+- **An event keeps failing:** after 5 tries it goes to its topic's `.dead-letter` topic and the partition moves on.
+  Fix the cause, then replay it (`docs/runbooks.md`).
+- **Members' data:** `GET /me/export` downloads everything held about a member; `DELETE /me` (or
+  `DELETE /admin/users/{id}`) erases the account, finishing in the worker within minutes.
+- **Staff changes** are logged in the `FeedFabric.Audit` category, with who made them.
 
-| Priority | Item |
-|---|---|
-| P0 | Land work in progress; CI on GitHub Actions (done, branch protection to add); remove the `/weatherforecast` template route |
-| P0 | Length caps on post and comment text; request body limits |
-| P0 | Rate limiting per user on writes, signals and previews, returning `429` with a stable code |
-| P0 | Worker failure safety: a maximum attempt count and a dead-letter topic, so one poison message can't stall a partition |
-| P0 | `/health/live` and `/health/ready` on the API and worker |
-| P0 | Migrations as a deploy step; fail fast on missing configuration; `ForwardedHeaders`, HSTS and CORS |
-| P1 | OpenTelemetry traces and metrics (outbox and consumer lag, ranker fallback rate), structured logs |
-| P1 | Retention jobs for the outbox, processed events, `FeedLog`, moderation events, abandoned media and Redis keys that never expire |
-| P1 | GDPR: account deletion across Postgres, Redis, blobs and `FeedLog`; subject access export |
-| P1 | Resilience: retries and timeouts for S3 and ClamAV, defined behaviour when Redis is down on every path |
-| P1 | Versioned, checksummed model publishing; refuse a ranker trained on simulated data outside Development |
-| P2 | Move the in-memory embedding search to pgvector or Redis; cache the dashboard; load tests |
-| P2 | Kafka replication and TLS; security headers; an audit log of admin actions; runbooks |
+## What's still open
+
+From `docs/production-readiness.md`: branch protection on `main`, a DPIA and privacy notice, moving the in-memory
+embedding search out of the API, setting a load target for the k6 test in `tools/load`, and a searchable audit table.
 
 ## Watching it run
 

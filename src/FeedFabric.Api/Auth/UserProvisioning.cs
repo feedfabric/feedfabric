@@ -114,5 +114,8 @@ public sealed partial class UserProvisioning(RequestDelegate next, IOptions<Auth
         }
     }
 
+    // After the account is deleted, so the next request with the same token makes a new one
+    public static void Forget(IMemoryCache cache, string externalUserId) => cache.Remove(CacheKey(externalUserId));
+
     private static string CacheKey(string externalUserId) => $"provisioned:{externalUserId}";
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Confluent.Kafka;
 using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Comments;
 using FeedFabric.Application.Services.Likes;
@@ -11,8 +12,9 @@ namespace FeedFabric.Worker.Events.Kafka;
 public class EngagementEventsConsumer(
     IServiceScopeFactory scopeFactory,
     IOptions<KafkaOptions> options,
+    IProducer<string, string> producer,
     TimeProvider timeProvider,
-    ILogger<EngagementEventsConsumer> logger) : EventConsumer(scopeFactory, options.Value.BootstrapServers, timeProvider, logger)
+    ILogger<EngagementEventsConsumer> logger) : EventConsumer(scopeFactory, options.Value, producer, timeProvider, logger)
 {
     protected override string Topic => Topics.Engagement;
 

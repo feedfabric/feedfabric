@@ -11,7 +11,8 @@ namespace FeedFabric.Application.Services.Safety;
 // Without the model it throws rather than guessing: a photo that couldn't be checked is never published.
 public sealed class NudityClassifier(IBlobStorage storage) : IDisposable
 {
-    private const string Prefix = "models/safety/nsfw";
+    // Where ml/fetch_models.py publishes it in blob storage
+    public const string Prefix = "models/safety/nsfw";
     private readonly SemaphoreSlim gate = new(1, 1);
     private InferenceSession? session;
     private Meta? meta;
@@ -65,13 +66,12 @@ public sealed class NudityClassifier(IBlobStorage storage) : IDisposable
             if (session is null || meta is null)
             {
                 await using var metaFile = await storage.GetAsync($"{Prefix}/meta.json", cancellationToken)
-                    ?? throw new InvalidOperationException($"No nudity model at {Prefix}: run make models.");
-                var loaded = await JsonSerializer.DeserializeAsync<Meta>(metaFile.Content, new JsonSerializerOptions(JsonSerializerDefaults.Web), cancellationToken)
+                    ?? throw new ModelNotFoundException($"No nudity model at {Prefix}: run make models.");
+                using var metaJson = await JsonDocument.ParseAsync(metaFile.Content, cancellationToken: cancellationToken);
+                var loaded = metaJson.RootElement.Deserialize<Meta>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                     ?? throw new InvalidOperationException("The nudity model's meta.json is empty.");
-                await using var modelFile = await storage.GetAsync($"{Prefix}/model.onnx", cancellationToken)
-                    ?? throw new InvalidOperationException($"No nudity model at {Prefix}: run make models.");
-                using var bytes = new MemoryStream();
-                await modelFile.Content.CopyToAsync(bytes, cancellationToken);
+                using var bytes = await ModelFiles.ReadAsync(storage, $"{Prefix}/model.onnx",
+                    ModelFiles.Checksum(metaJson.RootElement, "model.onnx"), "nudity model", cancellationToken);
                 session = new InferenceSession(bytes.ToArray());
                 meta = loaded;
             }

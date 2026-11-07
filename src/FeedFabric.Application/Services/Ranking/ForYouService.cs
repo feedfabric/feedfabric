@@ -274,6 +274,8 @@ public class ForYouService(
         var formula = rows.Select(HeuristicRanker.Score).ToArray();
         var modelScores = useModel ? model.Score(rows, scoring.Goals.ToDictionary()) : formula;
         var modelRanker = useModel ? $"model:{model.Info!.Version}" : "heuristic";
+        AppMetrics.Rankings.Add(1, new KeyValuePair<string, object?>("mode", scoring.Mode.ToString().ToLowerInvariant()),
+            new KeyValuePair<string, object?>("fallback", needsModel && !useModel));
 
         switch (scoring.Mode)
         {

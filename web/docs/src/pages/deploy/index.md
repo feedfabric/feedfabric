@@ -11,10 +11,9 @@ working setup (Docker Compose on a single Linux host behind Caddy) and what to c
 
 <div class="warn">
 
-**Read the gaps first.** FeedFabric doesn't yet have health endpoints, rate limiting, CORS, a dead-letter topic for
-the worker, or retention jobs; `docs/production-readiness.md` tracks them. It runs well behind a reverse proxy for a
-community you know, but put rate limits in the proxy and keep an eye on the worker before opening it to the
-internet at large.
+**Before real members join**, read `docs/production-readiness.md` for what's still open (a DPIA and privacy notice,
+a load target) and `docs/data-retention.md` for what FeedFabric keeps and for how long. `docs/runbooks.md` has what
+to do when something needs a person: dead-lettered events, rollbacks, swapping a model, erasing an account.
 
 </div>
 
@@ -22,16 +21,17 @@ internet at large.
 
 | Part | What it is | Needs |
 |---|---|---|
-| **API** | `ghcr.io/feedfabric/feedfabric/api`, listening on 8080 | Postgres, Redis, blob storage, your identity provider |
-| **Worker** | `ghcr.io/feedfabric/feedfabric/worker-events` | Postgres, Redis, Kafka, blob storage, ClamAV (unless turned off) |
+| **API** | `ghcr.io/feedfabric/feedfabric/api`, listening on 8080 | Postgres, Valkey, blob storage, your identity provider |
+| **Worker** | `ghcr.io/feedfabric/feedfabric/worker-events` | Postgres, Valkey, Kafka, blob storage, ClamAV (unless turned off) |
+| **Migrations** | `ghcr.io/feedfabric/feedfabric/migrations`, a one-off run before each deploy | Postgres |
 | **PostgreSQL 17** | The source of truth | A volume and backups |
-| **Redis 7.4** | Timelines, sessions, counters, embeddings: all rebuildable | Append-only persistence is enough |
+| **Valkey 8** (or Redis) | Timelines, sessions, counters, embeddings: all rebuildable | Append-only persistence is enough |
 | **Kafka 4** | Events from the outbox to the worker's consumers | One broker is fine to start; the outbox in Postgres means a lost broker loses nothing |
 | **Blob storage** | Photos and the models | Any S3-compatible service: S3, R2, MinIO, Spaces |
 | **ClamAV** | Malware scanning for uploads | About 3 GB of memory; or `MalwareScanning:Enabled=false` |
 | **Identity provider** | Signs members in; FeedFabric checks its tokens | Auth0, Entra ID, Cognito, Keycloak or any OpenID Connect server ([Sign-in and users](/auth/)) |
 | **Admin panel** | `web/admin`, a static site | Same origin as the API, or a proxy to it |
-| **Your front end** | Static or server-rendered | Same origin as the API (the API sends no CORS headers) |
+| **Your front end** | Static or server-rendered | Same origin as the API, or its origin in `Cors__AllowedOrigins__0` |
 
 The simulator is for demos and never runs in production. Neither does `Auth:Mode` `Dev`: it refuses to start outside
 Development.
@@ -40,13 +40,13 @@ Development.
 
 For a community in the thousands, one host runs everything: **4 vCPUs and 8 GB of memory** (16 GB with ClamAV) and
 fast disk for Postgres. The API keeps the last day's post embeddings and the loaded models in memory, and ranks on
-CPU, so CPU matters more than anything else as For You traffic grows. To grow past one host, move Postgres, Redis
+CPU, so CPU matters more than anything else as For You traffic grows. To grow past one host, move Postgres, Valkey
 and Kafka to managed services and run more API instances; see [Scaling](#scaling).
 
 ## 1. Images
 
-CI (`.github/workflows/ci.yml`) publishes both images to GitHub Container Registry on every push to `main` and
-every version tag:
+CI (`.github/workflows/ci.yml`) scans the three images with Trivy and publishes them to GitHub Container Registry on
+every push to `main` and every version tag:
 
 | Tag | When |
 |---|---|
@@ -60,6 +60,7 @@ the images yourself, from the repository root:
 ```bash
 docker build -f src/FeedFabric.Api/Dockerfile -t feedfabric-api .
 docker build -f src/FeedFabric.Worker.Events/Dockerfile -t feedfabric-worker .
+docker build -f src/FeedFabric.Application/Dockerfile -t feedfabric-migrations .
 ```
 
 ## 2. Blob storage
@@ -147,6 +148,8 @@ The minimum each service needs, beyond the connection strings:
 | `MalwareScanning__ClamAv__Host` | | ✓ | Or `MalwareScanning__Enabled=false` on both |
 | `Moderation__BlockedTerms__0`… | ✓ | ✓ | Your real list, kept out of the repository |
 | `AllowedHosts` | ✓ | | Your domain |
+| `ForwardedHeaders__Enabled` = `true` | ✓ | | Behind Caddy, so the API sees members' real addresses and HTTPS |
+| `Kafka__ReplicationFactor` = `1` | | ✓ | With a single broker; the default, 3, needs three |
 
 Every setting is in `docs/configuration.md`; [Operating it](/operating/#which-service-reads-what) lists which
 service reads which, and the ones that must match.
@@ -160,6 +163,8 @@ on `STAFF_DOMAIN`, and sends the API's routes on each to the API, so each app se
 # /opt/feedfabric/compose.yml
 x-app: &app
   restart: unless-stopped
+  # Longer than the services' ShutdownTimeout (25 seconds), so in-flight requests and events finish on a restart
+  stop_grace_period: 30s
   depends_on:
     db: { condition: service_healthy }
     redis: { condition: service_healthy }
@@ -183,7 +188,9 @@ services:
     environment:
       <<: *storage
       ASPNETCORE_ENVIRONMENT: Production
-      AllowedHosts: ${DOMAIN}
+      AllowedHosts: ${DOMAIN};${STAFF_DOMAIN}
+      # Only Caddy can reach the API on this network, so its X-Forwarded-* headers can be trusted
+      ForwardedHeaders__Enabled: "true"
       Auth__Jwt__Authority: ${AUTH_AUTHORITY}
       Auth__Jwt__Audience: ${AUTH_AUDIENCE}
 
@@ -194,7 +201,18 @@ services:
       <<: *storage
       DOTNET_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
+      # One broker, so one copy of each partition
+      Kafka__ReplicationFactor: "1"
       MalwareScanning__ClamAv__Host: clamav
+
+  # Not started with the others: `docker compose run --rm migrate` before each deploy
+  migrate:
+    image: ghcr.io/feedfabric/feedfabric/migrations:${FEEDFABRIC_VERSION}
+    profiles: [deploy]
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      ConnectionStrings__Default: Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
 
   db:
     image: postgres:17
@@ -209,13 +227,14 @@ services:
       interval: 5s
       retries: 10
 
+  # Valkey: the BSD-licensed fork of Redis. Redis itself works too.
   redis:
-    image: redis:7.4
+    image: valkey/valkey:8
     restart: always
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["valkey-server", "--appendonly", "yes"]
     volumes: [redisdata:/data]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 5s
       retries: 10
 
@@ -265,7 +284,7 @@ services:
 volumes: { pgdata: {}, redisdata: {}, kafkadata: {}, clamavdb: {}, caddydata: {} }
 ```
 
-Only Caddy publishes ports; Postgres, Redis, Kafka and the API are reachable only from inside the Compose network.
+Only Caddy publishes ports; Postgres, Valkey, Kafka and the API are reachable only from inside the Compose network.
 
 ### The reverse proxy
 
@@ -275,7 +294,7 @@ Only Caddy publishes ports; Postgres, Redis, Kafka and the API are reachable onl
 	encode zstd gzip
 
 	# The API's routes. Anything not listed here never reaches it.
-	@api path /userfeed* /follows* /favourites* /media* /me /ranking* /admin/*
+	@api path /userfeed* /follows* /favourites* /media* /me /me/* /ranking* /admin/*
 	handle @api {
 		reverse_proxy api:8080
 	}
@@ -294,7 +313,7 @@ Only Caddy publishes ports; Postgres, Redis, Kafka and the API are reachable onl
 {$STAFF_DOMAIN} {
 	encode zstd gzip
 
-	@api path /userfeed* /follows* /favourites* /media* /me /ranking* /admin/*
+	@api path /userfeed* /follows* /favourites* /media* /me /me/* /ranking* /admin/*
 	handle @api {
 		reverse_proxy api:8080
 	}
@@ -309,7 +328,8 @@ Only Caddy publishes ports; Postgres, Redis, Kafka and the API are reachable onl
 }
 ```
 
-Put the shared headers at the top of the same file:
+Put the shared headers at the top of the same file. The API sets its own security headers on its responses; these
+cover the static sites:
 
 ```text
 (security) {
@@ -329,37 +349,25 @@ behind Cloudflare Access.
 
 <div class="note">
 
-**Rate limits belong here for now.** FeedFabric doesn't limit requests per member yet. Caddy's `rate_limit` plugin,
-nginx's `limit_req`, or Cloudflare's rate limiting rules in front of the host can cap writes (`POST`, `PUT`,
-`DELETE` under `/userfeed` and `/media`) per client until it does.
+**Rate limits:** the API limits each member's posts, comments, reactions, reports, uploads and signals itself
+(`RateLimits`, in `docs/configuration.md`), answering `429` with `Retry-After`. A per-IP limit in the proxy (Caddy's
+`rate_limit` plugin, nginx's `limit_req`, Cloudflare's rules) is still worth having against floods from signed-out
+clients.
 
 </div>
 
 ## 6. Migrations
 
 Only Development migrates the database on startup. In production, migrate as a step of every deploy, **before** the
-new API and worker start. EF Core's migration bundle is a single executable that does exactly that:
+new API and worker start. The `migrations` image is EF Core's migration bundle for that version: it applies only the
+migrations the database doesn't have yet, each in its own transaction, and exits non-zero if one fails. With the
+Compose file above:
 
 ```bash
-# On a build machine with the .NET 10 SDK, from the repository root at the version you're deploying
-dotnet tool install --global dotnet-ef
-dotnet ef migrations bundle --project src/FeedFabric.Application --startup-project src/FeedFabric.Api \
-  --self-contained -r linux-x64 -o efbundle
-
-# On the server (or anywhere that can reach the database)
-./efbundle --connection "Host=…;Database=feedfabric;Username=feedfabric;Password=…"
+docker compose run --rm migrate
 ```
 
-It applies only the migrations the database doesn't have yet, so it's safe to run on every deploy. If you'd rather
-review SQL first, `dotnet ef migrations script --idempotent` writes the same changes as a script.
-
-With the Compose file above, Postgres isn't reachable from outside, so run the bundle in a container on its network:
-
-```bash
-docker compose up -d db
-docker run --rm --network feedfabric_default -v "$PWD/efbundle:/efbundle:ro" mcr.microsoft.com/dotnet/runtime-deps:10.0 \
-  /efbundle --connection "Host=db;Database=feedfabric;Username=feedfabric;Password=$POSTGRES_PASSWORD"
-```
+If you'd rather review SQL first, `dotnet ef migrations script --idempotent` writes the same changes as a script.
 
 ## 7. First start
 
@@ -367,7 +375,7 @@ docker run --rm --network feedfabric_default -v "$PWD/efbundle:/efbundle:ro" mcr
 cd /opt/feedfabric
 docker compose pull
 docker compose up -d db redis kafka clamav
-# … run the migration bundle (above) …
+docker compose run --rm migrate
 docker compose up -d
 docker compose logs -f api worker
 ```
@@ -381,7 +389,8 @@ Then check it end to end:
    FeedFabric has created your user.
 2. Post something through your front end (or the admin panel's composer) and see it in `GET /userfeed/home`.
 3. Upload a photo: it should go from `processing` to `ready` within seconds once ClamAV is up.
-4. Open the admin panel's *Settings and models*: it shows the sign-in setup, which models loaded, and the event
+4. Check `docker compose ps`: the API and the worker report `healthy` once their `/health/ready` checks pass.
+5. Open the admin panel's *Settings and models*: it shows the sign-in setup, which models loaded, and the event
    pipeline's lag. A growing outbox means the worker can't reach Kafka.
 
 ## Upgrading
@@ -389,25 +398,25 @@ Then check it end to end:
 ```bash
 cd /opt/feedfabric
 sed -i 's/^FEEDFABRIC_VERSION=.*/FEEDFABRIC_VERSION=1.5.0/' .env
-docker compose pull api worker
-# Build and run the migration bundle for 1.5.0 first
-docker compose up -d api worker
+docker compose pull migrate api worker
+docker compose run --rm migrate
+docker compose up -d worker
+docker compose up -d api
 ```
 
 Look at what changed under `src/FeedFabric.Application/Migrations` between the two versions before upgrading. Most
 migrations add things the old version ignores, so the old API keeps running while you migrate; for one that renames
-or drops something, stop the API and worker first. Redis needs nothing; anything in it can be rebuilt.
+or drops something, stop the API and worker first. Valkey needs nothing; anything in it can be rebuilt.
 
-To roll back, set the previous version and start it again. Migrations aren't rolled back automatically, so roll back
-the schema yourself (`./efbundle <previous migration>` goes back to it) only if the new one stops the old version
-working.
+To roll back, set the previous version and start it again. Migrations aren't rolled back automatically; roll back
+the schema yourself only if the new one stops the old version working, as `docs/runbooks.md` describes.
 
 ## Backups
 
 - **Postgres:** everything that matters. Nightly `pg_dump` (or your provider's point-in-time recovery), stored off
   the host, and a restore you've actually tried.
 - **The bucket:** members' photos and your trained models. Turn on versioning or replicate it.
-- **Redis and Kafka:** no backups needed. Timelines and counters can be rebuilt from Postgres, and unpublished
+- **Valkey and Kafka:** no backups needed. Timelines and counters can be rebuilt from Postgres, and unpublished
   events wait in the outbox.
 
 ## Scaling
@@ -415,11 +424,14 @@ working.
 - **API:** stateless apart from caches, so run as many instances as you like behind a load balancer. Each keeps
   the last day's post embeddings and the models in memory.
 - **Worker:** several can run side by side. The outbox publisher uses `SKIP LOCKED`, and each consumer group shares
-  its topic's partitions, so `Kafka:Partitions` (3 by default) is the most instances that help.
+  its topic's partitions, so `Kafka:Partitions` (3 by default) is the most instances that help. The retention job
+  runs in one of them at a time.
+- **Rate limits** are counted per API instance, so with three instances a member can make three times each limit.
 - **Postgres:** the first thing to move to a managed service. Add a connection pooler (PgBouncer) once you run more
   than a few API instances.
-- **Kafka:** for a cluster, set a replication factor of 3 and SASL/TLS, and create the topics yourself with
-  partitions sized for your load.
-- **Kubernetes or a container platform** (ECS, Cloud Run, Fly.io, Azure Container Apps): the same two images and
-  the same environment variables, with the migration bundle as a job that runs before each rollout. A worker must
+- **Kafka:** for a cluster, leave `Kafka:ReplicationFactor` at 3 and set `Kafka:Security` for SASL/TLS. The worker
+  creates its topics with those settings and `Kafka:Partitions`; create them yourself first to size them differently.
+- **Kubernetes or a container platform** (ECS, Cloud Run, Fly.io, Azure Container Apps): the same images and
+  the same environment variables, with the migrations image as a job that runs before each rollout, and
+  `terminationGracePeriodSeconds: 30`. A worker must
   run continuously, so not on a platform that scales to zero.

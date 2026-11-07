@@ -40,7 +40,10 @@ public static class ProblemResults
         404 => ErrorCodes.NotFound,
         405 => ErrorCodes.MethodNotAllowed,
         409 => ErrorCodes.Conflict,
+        413 => ErrorCodes.RequestTooLarge,
         415 => ErrorCodes.UnsupportedMediaType,
+        429 => ErrorCodes.RateLimited,
+        503 => ErrorCodes.ServiceUnavailable,
         _ => ErrorCodes.InternalError,
     };
 }

@@ -24,4 +24,7 @@ public static class EventTypes
     public const string UserMentioned = "UserMentioned";
 
     public const string MediaUploaded = "MediaUploaded";
+
+    // An account was deleted: the worker erases what the API didn't (AccountErasureHandler)
+    public const string UserDeleted = "UserDeleted";
 }

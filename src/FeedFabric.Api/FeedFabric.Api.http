@@ -1,10 +1,5 @@
 @FeedFabric_Api_HostAddress = http://localhost:5161
 
-GET {{FeedFabric_Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
-
 # No header: signed in as user 1
 GET {{FeedFabric_Api_HostAddress}}/me
 
@@ -51,5 +46,10 @@ PUT {{FeedFabric_Api_HostAddress}}/follows/2
 ###
 
 DELETE {{FeedFabric_Api_HostAddress}}/follows/2
+
+###
+
+# Everything held about the signed-in user, as one JSON download
+GET {{FeedFabric_Api_HostAddress}}/me/export
 
 ###

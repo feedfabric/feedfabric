@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
+using FeedFabric.Application.Services.Ranking.Profiles;
 using FeedFabric.Application.Services.Storage;
 
 namespace FeedFabric.Application.Services.Ranking;
@@ -10,7 +12,8 @@ namespace FeedFabric.Application.Services.Ranking;
 // models/ranker/latest.json at it. Checked for a new version at most once a minute; until there is one (or if it
 // was trained on different signals) the feed uses HeuristicRanker. ONNX Runtime runs on CPU, the same on a Mac
 // and on a Linux server.
-public sealed class RankerModel(IBlobStorage storage, TimeProvider timeProvider, ILogger<RankerModel> logger) : IDisposable
+public sealed class RankerModel(IBlobStorage storage, IOptions<RankingOptions> options, TimeProvider timeProvider, ILogger<RankerModel> logger)
+    : IDisposable
 {
     public const string LatestKey = "models/ranker/latest.json";
     private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(1);
@@ -114,6 +117,13 @@ public sealed class RankerModel(IBlobStorage storage, TimeProvider timeProvider,
             {
                 return;
             }
+            if (info.Source is not (null or "real") && !options.Value.AllowSimulatedRanker)
+            {
+                logger.LogWarning("Ranker model {Version} was trained on {Source} behaviour, not members'; keeping the {Current}. " +
+                    "Train with --source real, or set Ranking:AllowSimulatedRanker outside production",
+                    info.Version, info.Source, Info?.Version ?? "heuristic");
+                return;
+            }
             if (!info.Features.SequenceEqual(RankingFeatures.Names))
             {
                 logger.LogWarning("Ranker model {Version} was trained on different signals; keeping the heuristic", info.Version);
@@ -124,19 +134,24 @@ public sealed class RankerModel(IBlobStorage storage, TimeProvider timeProvider,
             var next = new Dictionary<string, InferenceSession>();
             foreach (var (head, key) in heads)
             {
-                await using var file = await storage.GetAsync(key, cancellationToken);
-                if (file is null)
+                MemoryStream bytes;
+                try
                 {
-                    logger.LogWarning("Ranker model {Version} points at {Key}, which is missing", info.Version, key);
+                    bytes = await ModelFiles.ReadAsync(storage, key, info.Sha256?.GetValueOrDefault(key), "ranker head", cancellationToken);
+                }
+                catch (ModelNotFoundException ex)
+                {
+                    logger.LogWarning("Ranker model {Version} can't be used yet: {Reason}", info.Version, ex.Message);
                     foreach (var loaded in next.Values)
                     {
                         loaded.Dispose();
                     }
                     return;
                 }
-                using var bytes = new MemoryStream();
-                await file.Content.CopyToAsync(bytes, cancellationToken);
-                next[head] = new InferenceSession(bytes.ToArray());
+                using (bytes)
+                {
+                    next[head] = new InferenceSession(bytes.ToArray());
+                }
             }
 
             var previous = sessions;
@@ -190,6 +205,9 @@ public sealed class RankerModelInfo
 
     // Whose behaviour it learned from: "real" members, "synthetic" (the simulator) or "all"
     public string? Source { get; set; }
+
+    // Each head's file (by key) to its SHA-256, checked on load; missing on models published before checksums
+    public Dictionary<string, string>? Sha256 { get; set; }
 
     // Per head ("auc_like"…), and for the combined score ("value_ndcg_at_10") against the formula ("heuristic_value_ndcg_at_10")
     public Dictionary<string, double> Metrics { get; set; } = [];
