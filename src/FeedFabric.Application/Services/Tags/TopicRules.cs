@@ -1,51 +1,98 @@
-using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace FeedFabric.Application.Services.Tags;
 
-// Keyword rules that tag a post with topics from a fixed list. A first pass: swap for an embedding
-// classifier once there's labelled data, keeping the same topic names.
-public static class TopicRules
+public enum TopicSource
 {
-    private static readonly Dictionary<string, string[]> Keywords = new()
+    // Topics:Enabled is false: hashtags only
+    Off,
+    // Chosen by staff in the admin panel
+    Saved,
+    // Topics:Keywords, until staff choose
+    Configuration,
+    // The built-in wellness set, until anyone chooses
+    Default,
+}
+
+// The topics posts are tagged with now. Version is the saved set's, 0 when it isn't from the database.
+public sealed record CurrentTopics(TopicSource Source, int Version, string? Library, IReadOnlyDictionary<string, List<string>> Topics,
+    DateTime? SavedAt, string? SavedBy, TopicMatcher Matcher);
+
+// Which topics apply: what staff saved in the admin panel, else Topics:Keywords, else the built-in wellness set.
+// Topics:Enabled false turns them off whatever was saved. Checks for a newly saved set at most once a minute, so
+// every instance picks up a change within a minute, and the one that saved it straight away (Changed).
+public sealed class TopicRules(IServiceScopeFactory scopes, IOptions<TopicOptions> options, TimeProvider timeProvider)
+{
+    private static readonly TimeSpan CheckEvery = TimeSpan.FromMinutes(1);
+
+    private readonly SemaphoreSlim gate = new(1, 1);
+    private CurrentTopics? current;
+    private DateTimeOffset nextCheck = DateTimeOffset.MinValue;
+
+    public async Task<CurrentTopics> CurrentAsync(CancellationToken cancellationToken)
     {
-        ["running"] = ["run", "ran", "running", "jog", "5k", "10k", "parkrun", "marathon", "/km", "pace", "intervals", "tempo"],
-        ["walking"] = ["walk", "walked", "walking", "stroll", "steps", "hike", "hiked", "hiking", "pram walk"],
-        ["travel"] = ["holiday", "trip", "travel", "back from", "beach", "villages", "balcony", "waterfall", "lisbon", "crete", "lake district",
-            "cornwall", "lanzarote", "tuscany", "sri lanka", "edinburgh", "algarve", "bali", "iceland", "mallorca", "peak district", "kyoto",
-            "snowdonia", "barcelona", "dolomites", "norfolk", "costa rica", "santorini", "vienna", "dorset"],
-        ["yoga"] = ["yoga", "pilates", "flow", "pose", "savasana", "sun salutations", "stretch", "stretching"],
-        ["strength"] = ["gym", "squats", "deadlifts", "bench", "overhead press", "pull-ups", "push day", "leg day", "kettlebell", "rep", "lifting",
-            "strength", "protein"],
-        ["cycling"] = ["bike", "ride", "rode", "cycle", "cycled", "cycling", "saddle", "hill ride"],
-        ["swimming"] = ["swim", "swam", "swimming", "lido", "open water", "sea swim", "snorkelled", "cold water"],
-        ["sleep"] = ["sleep", "slept", "bedtime", "early night", "hours of sleep", "nap"],
-        ["nutrition"] = ["coffee", "drinking more water", "meal prep", "cooking", "breakfast", "fruit", "snack", "alcohol", "herbal tea"],
-        ["mindfulness"] = ["meditation", "breathwork", "journaling", "body scan", "no screens", "phone-free", "switched off", "calm"],
-        ["recovery"] = ["physio", "rehab", "injury", "sore", "my knee", "my lower back", "my ankle", "my hips", "rest day", "recovery"],
-        ["parenting"] = ["baby", "kids", "pram", "buggy", "nap times", "nap time"],
-        ["workday"] = ["desk", "meeting", "lunch break", "taking the stairs", "took the stairs", "3pm", "standing"],
-        ["beginner"] = ["first ever", "couch to 5k", "beginner", "i'm new", "bought proper trainers", "scared of the gym"],
-    };
-
-    // Word boundaries, so "ran" doesn't match "orange" and "rep" doesn't match "prep"
-    private static readonly Dictionary<string, Regex> Patterns = Keywords.ToDictionary(
-        k => k.Key,
-        k => new Regex(
-            string.Join('|', k.Value.Select(w => $@"(?<![\w]){Regex.Escape(w)}(?![\w])")),
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled));
-
-    public static IReadOnlyCollection<string> Names => Keywords.Keys;
-
-    // One matching keyword is a hint (0.5); each extra match adds 0.25, up to 1
-    public static IEnumerable<(string Topic, double Confidence)> Match(string content)
-    {
-        foreach (var (topic, pattern) in Patterns)
+        if (current is { } known && timeProvider.GetUtcNow() < nextCheck)
         {
-            var matches = pattern.Matches(content).Select(m => m.Value.ToLowerInvariant()).Distinct().Count();
-            if (matches > 0)
+            return known;
+        }
+
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            // Another caller may have loaded it while this one waited
+            if (current is { } loaded && timeProvider.GetUtcNow() < nextCheck)
             {
-                yield return (topic, Math.Min(1, 0.5 + 0.25 * (matches - 1)));
+                return loaded;
             }
+
+            current = await LoadAsync(current, cancellationToken);
+            nextCheck = timeProvider.GetUtcNow().Add(CheckEvery);
+            return current;
+        }
+        finally
+        {
+            gate.Release();
         }
     }
+
+    // A new set was saved here: read it on the next post rather than within the minute
+    public void Changed() => nextCheck = DateTimeOffset.MinValue;
+
+    private async Task<CurrentTopics> LoadAsync(CurrentTopics? previous, CancellationToken cancellationToken)
+    {
+        var settings = options.Value;
+        if (!settings.Enabled)
+        {
+            return previous is { Source: TopicSource.Off } ? previous : Compile(TopicSource.Off, 0, null, [], null, null);
+        }
+
+        using var scope = scopes.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var version = await db.TopicSets.MaxAsync(t => (int?)t.Version, cancellationToken);
+        if (version is not null)
+        {
+            if (previous is { Source: TopicSource.Saved } && previous.Version == version)
+            {
+                return previous;
+            }
+            var row = await db.TopicSets.AsNoTracking().SingleAsync(t => t.Version == version, cancellationToken);
+            return Compile(TopicSource.Saved, row.Version, row.Library, TopicStore.Deserialize(row.Topics), row.SavedAt, row.SavedBy);
+        }
+
+        // Nothing saved: these don't change while the process runs, so keep what's compiled
+        var source = settings.Keywords.Count > 0 ? TopicSource.Configuration : TopicSource.Default;
+        if (previous?.Source == source)
+        {
+            return previous;
+        }
+        return source == TopicSource.Configuration
+            ? Compile(source, 0, null, TopicMatcher.Normalise(settings.Keywords), null, null)
+            : Compile(source, 0, TopicLibrary.Default.Key, TopicMatcher.From(TopicLibrary.Default), null, null);
+    }
+
+    private static CurrentTopics Compile(TopicSource source, int version, string? library, Dictionary<string, List<string>> topics,
+        DateTime? savedAt, string? savedBy) =>
+        new(source, version, library, topics, savedAt, savedBy, new TopicMatcher(topics));
 }

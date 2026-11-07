@@ -68,8 +68,9 @@ label such as "Only you can see this while it's reviewed"; nobody else will ever
 Each post gets tags of two kinds, returned on feed posts as `{ "tag", "source" }`:
 
 - **`hashtag`**: `#words` in the text, lowercased. A hashtag starts with a letter, so `#1` and `#5k` stay plain text.
-- **`inferred`**: topics from keyword rules (`TopicRules`: running, walking, travel, yoga, strength, cycling,
-  swimming and more), each with a confidence. A hashtag wins over an inferred topic of the same name.
+- **`inferred`**: topics from keyword rules, each with a confidence. They're configuration (`Topics:Keywords`), so
+  each community sets its own; left unset, the built-in wellness topics apply (running, walking, travel, yoga,
+  strength, cycling, swimming and more). A hashtag wins over an inferred topic of the same name.
 
 Tags drive the topic scores For You uses, `GET /userfeed/tags/trending` and `GET /userfeed/tags/{tag}/posts`.
 `@username` mentions of real users are stored with the post or comment and listed for the mentioned user by

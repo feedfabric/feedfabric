@@ -9,8 +9,9 @@ public static class TagBackfill
 {
     private const int BatchSize = 2000;
 
-    public static async Task RunAsync(AppDbContext db, ILogger logger)
+    public static async Task RunAsync(AppDbContext db, TopicRules rules, ILogger logger)
     {
+        var topics = (await rules.CurrentAsync(CancellationToken.None)).Matcher;
         var tagged = 0;
         // Keyset paging, so posts whose wording matches no tag are passed over rather than picked up again
         var after = Guid.Empty;
@@ -28,7 +29,7 @@ public static class TagBackfill
                 break;
             }
 
-            var tags = posts.SelectMany(p => TextTokens.TagsFor(p.Id, p.Content, p.CreatedAt)).ToList();
+            var tags = posts.SelectMany(p => TextTokens.TagsFor(p.Id, p.Content, p.CreatedAt, topics)).ToList();
             db.PostTags.AddRange(tags);
             await db.SaveChangesAsync();
             db.ChangeTracker.Clear();

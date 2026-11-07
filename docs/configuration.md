@@ -43,8 +43,8 @@ it:
   configuration.
 - `Simulator:ForYouProfiles`: profiles you list are added after the built-in `balanced`.
 
-The `Auth` lists are the exception: they start empty and only fall back to their defaults when you leave them empty,
-so the roles and claims you list replace the defaults.
+The `Auth` lists and `Topics:Keywords` are the exception: they start empty and only fall back to their defaults when
+you leave them empty, so the roles, claims and topics you list replace the defaults.
 
 ## Which service reads what
 
@@ -56,6 +56,7 @@ so the roles and claims you list replace the defaults.
 | `Media` | ✓ | ✓ | |
 | `Moderation` | ✓ | ✓ | ✓ |
 | `MalwareScanning` | ✓ (shown in the admin panel) | ✓ | |
+| `Topics` | ✓ | | ✓ |
 | `Feed` | ✓ | ✓ | ✓ |
 | `Ranking` | ✓ | | ✓ |
 | `Kafka` | | ✓ | |
@@ -155,6 +156,38 @@ Photo uploads. Allowed types are fixed in code: JPEG, PNG and WebP.
 
 `ml/tune_toxicity.py` tests the model against the toxicity thresholds, so keep its `LIMITS` in step when you change
 them.
+
+## Topics
+
+Posts are tagged with topics inferred from their wording, as well as their hashtags. For You uses topics to match
+posts to what a member reads, to draw "popular in your topics" candidates, and to avoid long runs of one topic.
+
+| Setting | Default | Notes |
+|---|---|---|
+| `Topics:Enabled` | `true` | Off tags posts with their hashtags only |
+| `Topics:Keywords` | empty, so the built-in wellness topics | Topic name to the words and phrases that suggest it. Setting any replaces all the built-in ones. |
+
+A topic name is a tag, so it follows the hashtag rules: a letter, then 1 to 49 letters, digits or `_`, lowercased. A
+hashtag and a topic with the same name are one tag. Keywords match whole words, ignoring case; one match gives a
+confidence of 0.5 and each further keyword adds 0.25, up to 1. A name that can't be a tag, or a topic with no
+keywords, stops startup. The built-in topics are in `src/FeedFabric.Application/Services/Tags/TopicLibrary.cs`.
+
+For a climbing community, in `appsettings.json` or a mounted `appsettings.Production.json`:
+
+```json
+"Topics": {
+  "Keywords": {
+    "bouldering": ["boulder", "bouldering", "crimp", "send", "project", "v4", "font 6a"],
+    "trad": ["trad", "cams", "nuts", "gear placement", "multi-pitch"],
+    "training": ["hangboard", "fingerboard", "campus board", "deadhang"]
+  }
+}
+```
+
+As environment variables, each keyword is one more level: `Topics__Keywords__bouldering__0=boulder`,
+`Topics__Keywords__bouldering__1=crimp`, and so on.
+
+Changing topics tags new and edited posts. Posts already tagged keep their tags.
 
 ## Malware scanning
 

@@ -47,6 +47,8 @@ public class AppDbContext : DbContext
 
     public DbSet<RankingProfileEntity> RankingProfiles => Set<RankingProfileEntity>();
 
+    public DbSet<TopicSetEntity> TopicSets => Set<TopicSetEntity>();
+
     public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
 
     public DbSet<ProcessedEventEntity> ProcessedEvents => Set<ProcessedEventEntity>();
@@ -301,6 +303,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.Key).HasMaxLength(RankingProfileStore.MaxKeyLength);
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.Settings).HasColumnType("jsonb");
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.SavedBy).HasMaxLength(64);
+
+        // One row per saved version of the topics; the latest is the live one
+        modelBuilder.Entity<TopicSetEntity>().HasIndex(t => t.Version).IsUnique();
+        modelBuilder.Entity<TopicSetEntity>().Property(t => t.Topics).HasColumnType("jsonb");
+        modelBuilder.Entity<TopicSetEntity>().Property(t => t.Library).HasMaxLength(TopicStore.MaxLibraryLength);
+        modelBuilder.Entity<TopicSetEntity>().Property(t => t.SavedBy).HasMaxLength(64);
 
         modelBuilder.Entity<PostEntity>().Property(p => p.Status).HasConversion<string>().HasMaxLength(16);
         modelBuilder.Entity<CommentEntity>().Property(c => c.Status).HasConversion<string>().HasMaxLength(16);

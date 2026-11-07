@@ -70,6 +70,15 @@ public class StartupTests
         Assert.Contains("Auth:Jwt", StartFails(settings).Message);
     }
 
+    [Fact]
+    public void A_topic_that_cant_be_a_tag_stops_startup()
+    {
+        var settings = Production();
+        settings["Topics:Keywords:deep water:0"] = "dws";
+
+        Assert.Contains("Topics:Keywords:deep water", StartFails(settings).Message);
+    }
+
     [Theory]
     [InlineData("Production")]
     [InlineData("Staging")]

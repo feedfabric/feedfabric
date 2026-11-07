@@ -14,6 +14,7 @@ using FeedFabric.Application.Services.Posts;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Storage;
+using FeedFabric.Application.Services.Tags;
 using FeedFabric.Application.Services.Users;
 using StackExchange.Redis;
 using Testcontainers.Kafka;
@@ -72,6 +73,7 @@ public sealed class PipelineFixture : IAsyncLifetime
             .Configure<ModerationOptions>(configuration.GetSection(ModerationOptions.Section))
             .AddSingleton<ToxicityClassifier>()
             .AddSingleton<TextModerator>()
+            .AddTopics(configuration)
             .AddScoped<FeedLog>()
             .AddScoped<FeatureBuilder>()
             .AddScoped<EmbeddingStore>()
