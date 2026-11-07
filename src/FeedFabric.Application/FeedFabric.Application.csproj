@@ -9,11 +9,11 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.14" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageReference Include="StackExchange.Redis" Version="3.4.31" />
-    <PackageReference Include="AWSSDK.S3" Version="4.0.104.9" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.104.11" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.1" />
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.14" />
-    <PackageReference Include="SkiaSharp" Version="3.119.4" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp" Version="4.155.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.155.0" />
   </ItemGroup>
 </Project>
