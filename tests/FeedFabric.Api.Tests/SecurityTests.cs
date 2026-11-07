@@ -52,13 +52,26 @@ public class SecurityTests(AuditFactory api) : IClassFixture<AuditFactory>
     {
         var client = api.ClientFor("staff-auditor", "moderator");
 
-        var response = await client.PutAsync("/admin/users/no-such-user/verified",
-            new StringContent("""{"verified":true}""", System.Text.Encoding.UTF8, "application/json"), TestContext.Current.CancellationToken);
+        using var body = new StringContent("""{"verified":true}""", System.Text.Encoding.UTF8, "application/json");
+        var response = await client.PutAsync("/admin/users/no-such-user/verified", body, TestContext.Current.CancellationToken);
         await client.GetAsync("/admin/users", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var entry = Assert.Single(api.Audit);
+        var entry = Assert.Single(api.Audit, e => e.Contains("no-such-user"));
         Assert.Contains("PUT /admin/users/no-such-user/verified by staff-auditor", entry);
         Assert.EndsWith("404", entry);
+    }
+
+    [Fact]
+    public async Task A_line_break_in_the_path_cant_forge_an_audit_line()
+    {
+        var client = api.ClientFor("staff-forger", "moderator");
+
+        using var body = new StringContent("""{"verified":true}""", System.Text.Encoding.UTF8, "application/json");
+        await client.PutAsync("/admin/users/x%0D%0AStaff%20action%20by%20someone-else/verified", body, TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(api.Audit, e => e.Contains("by staff-forger"));
+        Assert.DoesNotContain('\n', entry);
+        Assert.DoesNotContain('\r', entry);
     }
 }

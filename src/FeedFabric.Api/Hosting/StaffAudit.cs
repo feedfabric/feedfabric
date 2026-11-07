@@ -26,8 +26,8 @@ public sealed class StaffAudit(RequestDelegate next, ILoggerFactory loggers)
         {
             var user = context.User;
             logger.LogInformation("Staff action {Method} {Path} by {Actor} (roles {Roles}) from {RemoteIp}: {StatusCode}",
-                request.Method, request.Path.Value, user.FindFirst(IdentityClaims.UserId)?.Value ?? "(signed out)",
-                string.Join(",", user.FindAll(IdentityClaims.Role).Select(c => c.Value)), context.Connection.RemoteIpAddress,
+                request.Method, LogValue.Of(request.Path.Value), LogValue.Of(user.FindFirst(IdentityClaims.UserId)?.Value) ?? "(signed out)",
+                LogValue.Of(string.Join(",", user.FindAll(IdentityClaims.Role).Select(c => c.Value))), context.Connection.RemoteIpAddress,
                 context.Response.StatusCode);
         }
     }

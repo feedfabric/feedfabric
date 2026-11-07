@@ -1,6 +1,7 @@
 using System.Net;
 using Amazon.Runtime;
 using Microsoft.AspNetCore.Mvc;
+using FeedFabric.Api.Hosting;
 using FeedFabric.Application.Errors;
 using Npgsql;
 using StackExchange.Redis;
@@ -20,7 +21,7 @@ public sealed class DependencyDownHandler(ILogger<DependencyDownHandler> logger)
         {
             return false;
         }
-        logger.LogWarning(exception, "{Dependency} is unavailable; {Path} answered 503", dependency, httpContext.Request.Path);
+        logger.LogWarning(exception, "{Dependency} is unavailable; {Path} answered 503", dependency, LogValue.Of(httpContext.Request.Path.Value));
         httpContext.Response.Headers.RetryAfter = RetryAfterSeconds.ToString();
         var result = ProblemResults.Create(httpContext, StatusCodes.Status503ServiceUnavailable, ErrorCodes.ServiceUnavailable,
             "A service this needs is unavailable; try again shortly.", new { retryAfterSeconds = RetryAfterSeconds });

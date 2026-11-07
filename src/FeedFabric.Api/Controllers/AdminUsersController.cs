@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using FeedFabric.Api.Auth;
 using FeedFabric.Api.Errors;
+using FeedFabric.Api.Hosting;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Users;
@@ -68,7 +69,7 @@ public class AdminUsersController(AdminUserService users, AccountService account
         {
             return NotFoundUser(externalUserId);
         }
-        logger.LogInformation("{Staff} deleted the account of {ExternalUserId}", currentUser.ExternalUserId, externalUserId);
+        logger.LogInformation("{Staff} deleted the account of {ExternalUserId}", LogValue.Of(currentUser.ExternalUserId), LogValue.Of(externalUserId));
         AccountController.Forget(cache, externalUserId);
         return Accepted();
     }
