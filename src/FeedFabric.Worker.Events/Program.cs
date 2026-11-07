@@ -18,6 +18,7 @@ using FeedFabric.Worker.Events.FanOut;
 using FeedFabric.Worker.Events.Embeddings;
 using FeedFabric.Worker.Events.Kafka;
 using FeedFabric.Worker.Events.Media;
+using FeedFabric.Worker.Events.Accounts;
 using FeedFabric.Worker.Events.Outbox;
 using FeedFabric.Worker.Events.Retention;
 using FeedFabric.Hosting;
@@ -66,6 +67,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 });
 
 builder.Services.AddScoped<FeedFanOutHandler>();
+builder.Services.AddScoped<AccountErasureHandler>();
 builder.Services.AddScoped<LikeHandler>();
 builder.Services.AddScoped<CommentHandler>();
 builder.Services.AddBlobStorage(builder.Configuration);

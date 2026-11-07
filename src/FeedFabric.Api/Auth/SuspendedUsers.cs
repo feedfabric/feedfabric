@@ -18,6 +18,7 @@ public sealed class SuspendedUsers(RequestDelegate next, IMemoryCache cache)
     {
         var externalUserId = context.User.FindFirst(IdentityClaims.UserId)?.Value;
         if (externalUserId is not null && IsWrite(context.Request) && !IsStaffRoute(context.Request.Path) && !IsReadingSignal(context.Request.Path)
+            && !IsAccountDeletion(context.Request)
             && await StatusAsync(db, externalUserId, context.RequestAborted) == UserStatus.Suspended)
         {
             var problem = ProblemResults.Create(context, StatusCodes.Status403Forbidden, ErrorCodes.UserSuspended,
@@ -45,6 +46,9 @@ public sealed class SuspendedUsers(RequestDelegate next, IMemoryCache cache)
         path.StartsWithSegments("/userfeed/impressions") || path.StartsWithSegments("/userfeed/dwell")
         || (path.StartsWithSegments("/userfeed/posts", out var rest)
             && rest.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries) is [_, "open" or "not-interested" or "show-more"]);
+
+    // Suspended or not, members can delete their account
+    private static bool IsAccountDeletion(HttpRequest request) => HttpMethods.IsDelete(request.Method) && request.Path == "/me";
 
     private static bool IsStaffRoute(PathString path) => path.StartsWithSegments("/admin") || path.StartsWithSegments("/ranking");
 

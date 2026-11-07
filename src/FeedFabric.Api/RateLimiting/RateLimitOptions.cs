@@ -26,6 +26,9 @@ public class RateLimitOptions
 
     // POST /ranking/preview, which ranks a whole candidate set
     public RateLimitRule RankingPreview { get; set; } = new(30);
+
+    // GET /me/export and DELETE /me: an export reads everything the member has, so a few an hour
+    public RateLimitRule Account { get; set; } = new(5) { Window = TimeSpan.FromHours(1) };
 }
 
 public class RateLimitRule

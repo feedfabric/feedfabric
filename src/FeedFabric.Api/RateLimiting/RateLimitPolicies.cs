@@ -18,6 +18,7 @@ public static class RateLimitPolicies
     public const string Uploads = "uploads";
     public const string Signals = "signals";
     public const string RankingPreview = "ranking-preview";
+    public const string Account = "account";
 
     public static IServiceCollection AddFeedFabricRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
@@ -32,6 +33,7 @@ public static class RateLimitPolicies
             Add(limiter, Uploads, options.Uploads, options.Enabled);
             Add(limiter, Signals, options.Signals, options.Enabled);
             Add(limiter, RankingPreview, options.RankingPreview, options.Enabled);
+            Add(limiter, Account, options.Account, options.Enabled);
         });
         return services;
     }

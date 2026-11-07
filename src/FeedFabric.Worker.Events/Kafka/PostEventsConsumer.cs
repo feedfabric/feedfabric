@@ -3,6 +3,8 @@ using Confluent.Kafka;
 using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Posts;
+using FeedFabric.Application.Services.Users;
+using FeedFabric.Worker.Events.Accounts;
 using FeedFabric.Worker.Events.FanOut;
 
 namespace FeedFabric.Worker.Events.Kafka;
@@ -27,6 +29,11 @@ public class PostEventsConsumer(
                 var postCreated = JsonSerializer.Deserialize<EventEnvelope<PostCreatedEvent>>(payload, EventJson.Options)
                     ?? throw new JsonException("Payload is null.");
                 await services.GetRequiredService<FeedFanOutHandler>().HandleAsync(postCreated, cancellationToken);
+                break;
+            case EventTypes.UserDeleted:
+                var userDeleted = JsonSerializer.Deserialize<EventEnvelope<UserDeletedEvent>>(payload, EventJson.Options)
+                    ?? throw new JsonException("Payload is null.");
+                await services.GetRequiredService<AccountErasureHandler>().HandleAsync(userDeleted, cancellationToken);
                 break;
             default:
                 // Event types this worker doesn't handle yet

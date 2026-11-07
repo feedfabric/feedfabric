@@ -100,6 +100,7 @@ builder.Services.AddSingleton<TextModerator>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<AdminPostService>();
 builder.Services.AddScoped<EmbeddingStore>();
 // The last day's post embeddings in memory, for meaning-based candidates
