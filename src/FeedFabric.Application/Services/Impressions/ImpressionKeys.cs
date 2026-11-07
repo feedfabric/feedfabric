@@ -6,6 +6,10 @@ public static class ImpressionKeys
     // Set for a while after a viewer sees a post, so scrolling past it again isn't counted again
     public static string Seen(Guid viewerId, Guid postId) => $"imp:seen:{viewerId}:{postId}";
 
+    // A post's own signal keys (Viewers, PostDwell) expire this long after it was last seen; the retention job also
+    // drops old posts from the totals below
+    public static readonly TimeSpan PostSignalLifetime = TimeSpan.FromDays(30);
+
     // Sorted set of every post's total impressions
     public const string PostTotals = "impressions:posts";
 

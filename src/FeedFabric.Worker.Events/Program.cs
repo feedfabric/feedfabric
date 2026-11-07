@@ -7,6 +7,7 @@ using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Health;
 using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Media;
+using FeedFabric.Application.Services.Retention;
 using FeedFabric.Application.Services.Messaging;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Scanning;
@@ -18,6 +19,7 @@ using FeedFabric.Worker.Events.Embeddings;
 using FeedFabric.Worker.Events.Kafka;
 using FeedFabric.Worker.Events.Media;
 using FeedFabric.Worker.Events.Outbox;
+using FeedFabric.Worker.Events.Retention;
 using FeedFabric.Hosting;
 using StackExchange.Redis;
 
@@ -84,6 +86,9 @@ builder.Services.AddHealthChecks()
     .AddCheck<KafkaHealthCheck>("kafka", HealthStatus.Unhealthy, [HealthTags.Ready])
     .AddModels(HealthStatus.Unhealthy, NudityClassifier.Prefix, TextEmbedder.Prefix);
 
+builder.Services.Configure<RetentionOptions>(builder.Configuration.GetSection(RetentionOptions.Section));
+builder.Services.AddScoped<RetentionService>();
+builder.Services.AddHostedService<RetentionWorker>();
 builder.Services.AddHostedService<OutboxPublisher>();
 builder.Services.AddHostedService<PostEventsConsumer>();
 builder.Services.AddHostedService<EngagementEventsConsumer>();

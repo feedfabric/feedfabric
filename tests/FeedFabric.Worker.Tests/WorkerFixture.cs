@@ -5,14 +5,17 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.Kafka;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
+using StackExchange.Redis;
 
 namespace FeedFabric.Worker.Tests;
 
-// Postgres (migrated) and a single Kafka broker in containers, shared by every test in the "worker" collection
+// Postgres (migrated), Redis and a single Kafka broker in containers, shared by every test in the "worker" collection
 public sealed class WorkerFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer postgres = new PostgreSqlBuilder("postgres:17").Build();
     private readonly KafkaContainer kafka = new KafkaBuilder("apache/kafka:4.0.0").Build();
+    private readonly RedisContainer redis = new RedisBuilder("redis:7.4").Build();
 
     public string BootstrapServers => kafka.GetBootstrapAddress();
 
@@ -20,9 +23,12 @@ public sealed class WorkerFixture : IAsyncLifetime
 
     public IProducer<string, string> Producer { get; private set; } = null!;
 
+    public IConnectionMultiplexer Redis { get; private set; } = null!;
+
     public async ValueTask InitializeAsync()
     {
-        await Task.WhenAll(postgres.StartAsync(), kafka.StartAsync());
+        await Task.WhenAll(postgres.StartAsync(), kafka.StartAsync(), redis.StartAsync());
+        Redis = await ConnectionMultiplexer.ConnectAsync($"{redis.GetConnectionString()},allowAdmin=true");
         Services = new ServiceCollection()
             .AddDbContext<AppDbContext>(options => options.UseNpgsql(postgres.GetConnectionString()))
             .AddLogging()
@@ -76,11 +82,12 @@ public sealed class WorkerFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         Producer?.Dispose();
+        Redis?.Dispose();
         if (Services is not null)
         {
             await Services.DisposeAsync();
         }
-        await Task.WhenAll(postgres.DisposeAsync().AsTask(), kafka.DisposeAsync().AsTask());
+        await Task.WhenAll(postgres.DisposeAsync().AsTask(), kafka.DisposeAsync().AsTask(), redis.DisposeAsync().AsTask());
     }
 }
 
