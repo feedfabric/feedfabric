@@ -51,7 +51,10 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `method_not_allowed` | 405 | | |
 | `conflict` | 409 | | Generic fallback |
 | `unsupported_media_type` | 415 | | Send `Content-Type: application/json` |
+| `request_too_large` | 413 | | The request body is over the limit (`Kestrel:Limits:MaxRequestBodySize`, 1 MB) |
+| `rate_limited` | 429 | `retryAfterSeconds` | Too many requests of one kind; wait that long (also sent as `Retry-After`) |
 | `internal_error` | 500 | | Unexpected server error; quote `traceId` when reporting it |
+| `service_unavailable` | 503 | `retryAfterSeconds` | Postgres, Redis or blob storage can't be reached for now; retry after `Retry-After` |
 
 `validation_failed` lists each problem in `errors`. `field` is the camelCase field name; it is left out when the problem is the whole request body.
 
@@ -69,6 +72,7 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 |---|---|---|
 | `required` | | Missing or blank |
 | `out_of_range` | `min`, `max` | Outside the allowed range |
+| `too_long` | `max` | More characters than allowed: 5,000 for a post, 2,000 for a comment |
 | `invalid_value` | | Wrong format or type, e.g. a malformed ID or JSON |
 
 Codes are defined in `src/FeedFabric.Application/Errors/ErrorCodes.cs`. Codes are never renamed; new ones may be added, so clients should fall back to a generic message for codes they don't recognise.

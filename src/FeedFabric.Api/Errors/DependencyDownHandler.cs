@@ -9,7 +9,7 @@ namespace FeedFabric.Api.Errors;
 
 // When Postgres, Redis or blob storage can't be reached, a request that needs it is a 503 service_unavailable with
 // Retry-After rather than a 500: the client did nothing wrong and can try again. The home feed doesn't get here
-// without Redis (it reads Postgres instead); see docs/operating.md for what each path does.
+// without Redis (it reads Postgres instead); see docs/runbooks.md (Redis is down) for what each path does.
 public sealed class DependencyDownHandler(ILogger<DependencyDownHandler> logger) : Microsoft.AspNetCore.Diagnostics.IExceptionHandler
 {
     private const int RetryAfterSeconds = 5;

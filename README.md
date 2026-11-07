@@ -205,6 +205,10 @@ Each simulated user has a main interest and one or two secondary interests. Then
 - [Configuration](docs/configuration.md): every setting and environment variable, and which service reads it
 - [Data model](docs/data-model.md): every entity and field, and the event flow
 - [API errors](docs/errors.md): codes, statuses and validation errors
+- [Deploying](docs/deploying.md): the images, the order to roll them out, health checks and scaling
+- [Runbooks](docs/runbooks.md): rollback, dead-lettered events, rebuilding timelines, swapping models, the moderation backlog
+- [Data retention](docs/data-retention.md): what is kept, for how long, and what deleting an account leaves
+- [Production readiness](docs/production-readiness.md): where the plan for running it for real stands
 
 ## Licence
 

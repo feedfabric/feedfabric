@@ -1,134 +1,157 @@
 # Production readiness
 
-What FeedFabric needs before it runs for real members. The domain is in good shape (outbox to Kafka, idempotent
-consumers, OIDC auth with role policies, a safety pipeline that blocks when a check can't run, signed upload URLs);
-what's missing is the layer around it that lets it be deployed, operated and trusted.
+What FeedFabric needs before it runs for real members, and where each item stands. The domain was already in good
+shape (outbox to Kafka, idempotent consumers, OIDC auth with role policies, a safety pipeline that blocks when a check
+can't run, signed upload URLs); this plan covered the layer around it that lets it be deployed, operated and trusted.
 
 **Done means:** the API and worker deploy to a real environment from GitHub Actions, survive restarts and bad input,
 can be observed and operated, and meet UK GDPR obligations for health-adjacent user content.
 
-Every item ends with a green CI run and, where it applies, a test that proves it. Work P0 first: items 1 to 3 in
-order, then 4 to 9 in parallel; then P1; then P2.
+## Still open
+
+| Item | What's left | Owner |
+|---|---|---|
+| 2 | Branch protection on `main`, requiring the CI checks. Repository settings, not code. | Kieran |
+| 12 | A DPIA and a privacy notice ([data-retention.md](data-retention.md#still-to-do-by-people)) | Kieran |
+| 16 | Move `EmbeddingIndex` out of each API instance (needs a pgvector migration, so not done with this plan) | |
+| 16 | Set the load target, then run `tools/load/feeds.js` against it | Kieran |
+| 18 | The staff audit log is structured logs; move it to a table if staff need to search it in the admin panel (needs a migration) | |
+| 18 | Pin the GitHub Actions to commit SHAs, `aquasecurity/trivy-action` first | |
 
 ## P0: blockers
 
 ### 1. Land the work in progress
-About 120 files are uncommitted, among them the whole of auth, admin, reports and the review queue, the `web/admin`
-panel and two migrations (`AddReviewQueue`, `AddUserDisplayName`). Commit them as reviewable PRs before anything else
-builds on them.
+**Done.** The work is on `main`, and the migrations are squashed into `InitialCreate`.
 
 ### 2. CI on GitHub Actions
-**Done:** `.github/workflows/ci.yml`. Still to do by hand: branch protection on `main` requiring its checks.
-
-Workflows that run on pull requests and on `main`:
-- `dotnet build` and `dotnet test` for the solution.
-- Docker builds of `src/FeedFabric.Api/Dockerfile` and `src/FeedFabric.Worker.Events/Dockerfile`, pushed to GHCR on
-  `main` and tags.
-- `npm ci && npm run build` for `web/admin`.
-- The `TextModeratorTests` (10 of them) fail without the toxicity model (`No vocab.json … run make models`). Either
-  fetch the models in CI with `actions/cache` keyed on `ml/fetch_models.py`, or move model tests into a separate job
-  or trait so the main job is green without them.
-- Branch protection on `main` requiring the checks.
-
-**Done:** a PR shows build, test, images and admin as passing checks.
+**Done**, apart from branch protection. `.github/workflows/ci.yml` builds and tests the solution, with the models
+cached by `ml/fetch_models.py`'s hash so the model tests run. It also builds `web/admin` and `web/fabric-ui`, then
+builds, scans and publishes the three images.
 
 ### 3. Remove template leftovers
-`/weatherforecast` and the `WeatherForecast` record in `src/FeedFabric.Api/Program.cs`.
+**Done.** `/weatherforecast` is gone from the API and from `FeedFabric.Api.http`.
 
 ### 4. Input validation
-- `PostRequest.Content` and `CommentRequest.Content` have no maximum length. Add caps with an `ErrorCodes` code,
-  listed in `docs/errors.md`.
-- Kestrel request body size limits.
+**Done.** Posts are capped at 5,000 characters and comments at 2,000 (`too_long`). Request bodies are capped at
+1 MB (`Kestrel:Limits:MaxRequestBodySize`, `413 request_too_large`). Both are listed in [errors.md](errors.md).
 
 ### 5. Rate limiting
-`AddRateLimiter`, partitioned per user, on posting, commenting, likes and reposts, reports, media uploads,
-impressions and dwell, and `POST /ranking/preview`. Returns 429 Problem Details with a stable code.
+**Done.** Fixed-window limits per user (per IP when signed out) on posting, commenting, reactions, reports, uploads,
+signals, ranking previews, and the account export and deletion. Over a limit is `429 rate_limited` with
+`Retry-After`. The limits are set under `RateLimits` ([configuration.md](configuration.md#rate-limits-api)). They are
+counted per instance ([deploying.md](deploying.md#scaling)).
 
 ### 6. Make the worker's failures safe
-- `Kafka/EventConsumer.cs` retries a failing handler forever (only `JsonException` is skipped), so one poison
-  message stalls its partition for that group. Add a maximum attempt count, then publish to a dead-letter topic and
-  log or alert.
-- `Outbox/OutboxPublisher.cs` also retries failed messages forever. Add a maximum attempt count and a parked state.
-- If one message in a batch fails and a later one with the same key succeeds, per-key order breaks. Stop the batch
-  for that key, or document why order doesn't matter for those events.
+**Done.**
+- A handler failure is tried `Kafka:MaxHandlerAttempts` times (5), then the event goes to `<topic>.dead-letter` with
+  its error, and the partition moves on. A failure because a dependency is down is retried until it's back.
+- The outbox parks a message after `Outbox:MaxPublishAttempts` (10). Parked messages are counted in the admin panel.
+- Order: later events for the same key are still handled. That is safe because handlers are idempotent and check the
+  current state. The reasoning is in `EventConsumer`, and the replay steps are in
+  [runbooks.md](runbooks.md#a-consumer-dead-lettered-events).
 
 ### 7. Health checks
-`/health/live` and `/health/ready` on the API and the worker: Postgres, Redis, Kafka, ClamAV (when `MalwareScanning:Enabled`) and models loaded.
-Add `HEALTHCHECK` to the Dockerfiles or probes to the deployment.
+**Done.** `/health/live` and `/health/ready` on both. Each image has a `HEALTHCHECK` that calls the app itself,
+because the images have no curl. The checks are in [deploying.md](deploying.md#health-checks).
 
 ### 8. Migrations as a deploy step
-Startup only migrates in Development. Build an EF migration bundle in CI and run it as a job before the API rolls
-out; document the order.
+**Done.** The `migrations` image is an EF migration bundle that runs before the API rolls out
+([deploying.md](deploying.md#order)).
 
 ### 9. Production configuration and secrets
-- Fail fast at startup when `Auth:Jwt` is empty or a connection string is missing.
-- Secrets come from the platform's secret store, never config files. Every setting and its environment variable is in
-  [configuration.md](configuration.md).
-- `AllowedHosts`, `ForwardedHeaders` and HSTS behind a proxy; a CORS policy for the admin panel's origin.
-- `BlobStorage:Provider` must be `S3` outside Development.
+**Done.**
+- Startup fails on a missing connection string or `Auth:Jwt` setting.
+- Startup also fails on `Auth:Mode=Dev` or local blob storage outside Development.
+- `ForwardedHeaders`, HSTS and a CORS policy (`Cors:AllowedOrigins`) are in.
+- Every setting is in [configuration.md](configuration.md).
 
 ## P1: operability
 
 ### 10. Observability
-- OpenTelemetry traces and metrics for API, worker, EF Core, Redis and Kafka, with trace context carried in Kafka
-  headers so one request can be followed through the worker.
-- Structured JSON logs.
-- Metrics: outbox lag, consumer lag, dead-letter count, moderation held and blocked rates, ranker fallback rate, p95
-  latency of the feed routes.
+**Done.**
+- OpenTelemetry covers ASP.NET Core, Postgres (Npgsql), Redis, HTTP and the worker's own spans. Trace context travels in Kafka
+  headers, so one request can be followed into the worker. Data goes out over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT`
+  is set.
+- Logs are JSON on the console.
+- Metrics: `feedfabric.outbox.waiting`, `.lag` and `.parked`; `feedfabric.consumer.lag`;
+  `feedfabric.events.handled` and `.dead_lettered`; `feedfabric.moderation.checks`; `feedfabric.ranking.rankings`
+  (with the fallback rate). Feed latency comes from ASP.NET Core's request duration, by route.
 
 ### 11. Data retention
-Nothing is purged today. Add jobs for processed `OutboxMessages` and `ProcessedEvents`, `FeedLog` (one row per post
-served), `ModerationEvents`, abandoned media, and the Redis keys that never expire (`impressions:posts`,
-`post:{id}:viewers`).
+**Done.**
+- The worker's retention job deletes published outbox messages, processed-event records, the feed log, decided
+  moderation events, abandoned and rejected media, and old Redis post totals. Each one runs on its own period under
+  `Retention:*`.
+- Per-post Redis keys now expire. Older keys are given an expiry once a day.
+- [data-retention.md](data-retention.md) is the written policy.
 
 ### 12. GDPR: deletion and export
-Members write about pregnancy, injuries and sleep, so treat content as likely special-category data.
-- Account deletion that cascades through Postgres, Redis timelines and embeddings, blobs and `FeedLog`.
-- A subject access export.
-- A written retention policy. A DPIA is for people, not agents, but the hooks above are needed for it.
+**Done**, apart from the DPIA.
+- `DELETE /me` and `DELETE /admin/users/{externalUserId}` take posts, comments and the profile down at once.
+- The worker then removes the rest: Postgres rows, Redis (including other members' timelines), embeddings, blobs and
+  the feed log.
+- `GET /me/export` is the subject access export.
+- What deletion leaves behind, and why, is in [data-retention.md](data-retention.md#deleting-an-account). No schema
+  change was needed: the account row stays as an anonymised tombstone.
 
 ### 13. Resilience
-- Retries and timeouts for S3 and ClamAV calls.
-- Defined behaviour when Redis is down on every path, not only the home feed. The worker's Redis connection lacks
-  `AbortOnConnectFail = false`, unlike the API's.
-- Graceful shutdown timeouts for the consumers.
+**Done.**
+- S3 has a timeout and standard retries.
+- ClamAV retries when it can't connect, then waits on Kafka. Nothing is published unscanned.
+- When Postgres, Redis or S3 can't be reached, the API answers `503 service_unavailable` with `Retry-After`.
+- The home feed falls back to Postgres. A lost or cleared timeline also continues from Postgres.
+- The worker's Redis connection no longer aborts on connect failure.
+- `ShutdownTimeout` (25 s) applies to both services.
+- What each path does with Redis down is in [runbooks.md](runbooks.md#redis-is-down), and it's tested.
 
 ### 14. Models in production
-- A versioned, checksummed way to publish the toxicity, nudity and MiniLM models to blob storage, and the readiness
-  check from item 7 waiting on them.
-- Refuse to serve a ranker trained on simulated data outside Development (today the dashboard only labels it).
+**Done.**
+- Every model file's SHA-256 is in its `meta.json` (the ranker's in `latest.json`), and a mismatch is refused.
+- The readiness checks wait on the models.
+- A ranker trained on simulated data is refused outside Development (`Ranking:AllowSimulatedRanker`).
+- How to swap a model is in [runbooks.md](runbooks.md#swap-a-model).
 
 ### 15. Integration tests
-Testcontainers for Postgres, Redis and Kafka, run in CI:
-- create post → fan-out → home feed
-- like and comment events update counts
-- moderation hold → approve or remove
-- media upload → scan → ready
-- authorization: each policy, suspended users, and `Auth:Mode=Dev` refusing to start outside Development
+**Done.**
+- `tests/FeedFabric.Worker.Tests/PipelineTests.cs` runs the real worker against Postgres, Redis and Kafka in
+  Testcontainers. It covers fan-out to the home feed, a rebuilt timeline, likes and comments reaching the signals,
+  report → hold → approve or remove, and upload → scan → ready.
+- `tests/FeedFabric.Api.Tests/AuthorizationTests.cs` checks each policy and that every staff route has one. It also
+  covers suspended users and `Auth:Mode=Dev` refusing to start outside Development.
 
 ## P2: scale and hardening
 
 ### 16. Scaling limits
-- `EmbeddingIndex` is an in-memory brute-force search held in each API instance; move it to pgvector or Redis vector
-  search.
-- `/admin/dashboard` runs many full-table counts per call; cache or pre-aggregate.
-- Load test For You and home feeds against a target (to be set: requests per second and p95).
+**Partly done.**
+- `/admin/dashboard` is cached per window for 15 seconds, and only one instance builds it at a time.
+- `tools/load/feeds.js` is a k6 load test for the home and For You feeds. It fails the run when p95 is over the
+  target.
+- Open: the target itself, and `EmbeddingIndex`. The index is still in memory in each API instance and only holds a
+  day's posts. pgvector would need a migration.
 
 ### 17. Kafka in production
-Replication factor of at least 3, SASL/TLS, topic retention and partition counts sized for the load
-(`KafkaTopics.EnsureCreatedAsync` creates them today).
+**Done.**
+- Topics the worker creates have `Kafka:ReplicationFactor` (3), `Kafka:Partitions` (3) and retention settings: 7
+  days for events, 28 days for dead-letter topics.
+- `Kafka:Security` configures SASL/TLS for managed Kafka.
 
 ### 18. Security
-- Security headers on API responses.
-- An audit log of admin actions: suspend, verify, moderation decisions, ranking profile saves.
-- Dependabot and container image scanning (for example Trivy) in GitHub Actions.
-- A security review of `src/FeedFabric.Api/Auth` and the admin controllers.
+**Done**, apart from the open rows above.
+- API responses carry security headers: `nosniff`, `X-Frame-Options: DENY`, a deny-all CSP, `Referrer-Policy`,
+  `Permissions-Policy`, and `no-store` by default. They don't carry a `Server` header.
+- Staff changes are logged in the `FeedFabric.Audit` category ([runbooks.md](runbooks.md#the-staff-audit-log)).
+- Dependabot covers NuGet, npm, uv, Docker and Actions.
+- Trivy scans each image in CI and fails on fixable critical or high vulnerabilities. The images install Ubuntu's
+  security updates.
+- Security review of `Auth` and the admin controllers:
+  - Fixed: a token could carry FeedFabric's own `ff:` claims and grant itself roles. They're now stripped.
+  - Confirmed: every staff route has a staff policy (there's a test for this), and `/admin/system` shows no secrets.
 
 ### 19. Runbooks
-In `docs/`: deploy, rollback, replaying the dead-letter topic, rebuilding Redis timelines from Postgres, swapping a
-model, working down a moderation backlog.
+**Done.** [runbooks.md](runbooks.md) covers deploy, rollback, the dead-letter topics, parked outbox messages,
+rebuilding Redis timelines, Redis down, swapping a model, the moderation backlog, erasing an account and the audit
+log. [deploying.md](deploying.md) is the deployment guide.
 
-## Open decisions (owner: Kieran)
-- **Deployment target:** decided: Docker, from the images CI publishes to GHCR. Items 7, 8 and 9 target that
-  (a `HEALTHCHECK` in each image, a migration bundle run as a one-off container, settings as environment variables).
-- **Load target** for item 16.
+## Decisions (owner: Kieran)
+- **Deployment target:** Docker, from the images CI publishes to GHCR.
+- **Load target** for item 16: to be set (requests per second and p95).

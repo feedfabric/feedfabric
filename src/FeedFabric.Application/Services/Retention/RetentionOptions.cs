@@ -1,6 +1,6 @@
 namespace FeedFabric.Application.Services.Retention;
 
-// How long data is kept before the worker's retention job deletes it (docs/retention.md is the policy these
+// How long data is kept before the worker's retention job deletes it (docs/data-retention.md is the policy these
 // implement). Shorten rather than lengthen: members write about their health, so keep only what has a use.
 public class RetentionOptions
 {

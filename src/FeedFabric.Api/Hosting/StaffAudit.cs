@@ -5,7 +5,7 @@ namespace FeedFabric.Api.Hosting;
 // The audit log of staff actions: every change made through /admin or /ranking (suspending, verifying or deleting a
 // user, a moderation decision, saving or deleting a ranking profile, setting the default), who made it and how it
 // ended, as a structured log event in the "FeedFabric.Audit" category. Ship that category to storage staff can't
-// edit (docs/operating.md). The moderation log and profile versions keep their own record of who decided what.
+// edit (docs/runbooks.md). The moderation log and profile versions keep their own record of who decided what.
 public sealed class StaffAudit(RequestDelegate next, ILoggerFactory loggers)
 {
     private readonly ILogger logger = loggers.CreateLogger("FeedFabric.Audit");
