@@ -67,12 +67,11 @@ public sealed class NudityClassifier(IBlobStorage storage) : IDisposable
             {
                 await using var metaFile = await storage.GetAsync($"{Prefix}/meta.json", cancellationToken)
                     ?? throw new ModelNotFoundException($"No nudity model at {Prefix}: run make models.");
-                var loaded = await JsonSerializer.DeserializeAsync<Meta>(metaFile.Content, new JsonSerializerOptions(JsonSerializerDefaults.Web), cancellationToken)
+                using var metaJson = await JsonDocument.ParseAsync(metaFile.Content, cancellationToken: cancellationToken);
+                var loaded = metaJson.RootElement.Deserialize<Meta>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                     ?? throw new InvalidOperationException("The nudity model's meta.json is empty.");
-                await using var modelFile = await storage.GetAsync($"{Prefix}/model.onnx", cancellationToken)
-                    ?? throw new ModelNotFoundException($"No nudity model at {Prefix}: run make models.");
-                using var bytes = new MemoryStream();
-                await modelFile.Content.CopyToAsync(bytes, cancellationToken);
+                using var bytes = await ModelFiles.ReadAsync(storage, $"{Prefix}/model.onnx",
+                    ModelFiles.Checksum(metaJson.RootElement, "model.onnx"), "nudity model", cancellationToken);
                 session = new InferenceSession(bytes.ToArray());
                 meta = loaded;
             }

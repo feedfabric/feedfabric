@@ -11,6 +11,11 @@ public class RankingOptions
 
     // The profile For You uses when a request doesn't name one: a preset key or a saved profile's key
     public string DefaultProfile { get; set; } = RankingPresets.Balanced;
+
+    // Serve a ranker trained on the simulator's behaviour ("synthetic" or "all" in latest.json). True in
+    // Development and in the simulator; elsewhere such a model is refused and For You keeps the formula, since it
+    // learned what simulated personas like, not what members do.
+    public bool AllowSimulatedRanker { get; set; }
 }
 
 // A profile ready to rank with: its settings, its formula parsed, and the label FeedLog records

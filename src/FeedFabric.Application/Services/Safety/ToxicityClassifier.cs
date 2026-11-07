@@ -72,9 +72,9 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
                 labels = meta.RootElement.GetProperty("labels").EnumerateArray().Select(l => l.GetString()!).ToArray();
                 maxTokens = meta.RootElement.GetProperty("maxTokens").GetInt32();
 
-                using var vocab = await ReadAsync("vocab.json", cancellationToken);
-                using var merges = await ReadAsync("merges.txt", cancellationToken);
-                using var bytes = await ReadAsync("model.onnx", cancellationToken);
+                using var vocab = await ReadAsync("vocab.json", meta.RootElement, cancellationToken);
+                using var merges = await ReadAsync("merges.txt", meta.RootElement, cancellationToken);
+                using var bytes = await ReadAsync("model.onnx", meta.RootElement, cancellationToken);
                 tokenizer = CodeGenTokenizer.Create(vocab, merges, addPrefixSpace: false, addBeginOfSentence: false, addEndOfSentence: false);
                 startId = tokenizer.Vocabulary["<s>"];
                 endId = tokenizer.Vocabulary["</s>"];
@@ -88,16 +88,9 @@ public sealed class ToxicityClassifier(IBlobStorage storage) : IDisposable
         }
     }
 
-    // The whole file, since the tokenizer and ONNX Runtime both want a seekable stream or bytes
-    private async Task<MemoryStream> ReadAsync(string name, CancellationToken cancellationToken)
-    {
-        await using var file = await storage.GetAsync($"{Prefix}/{name}", cancellationToken)
-            ?? throw new ModelNotFoundException($"No {name} for the toxicity model at {Prefix}: run make models.");
-        var copy = new MemoryStream();
-        await file.Content.CopyToAsync(copy, cancellationToken);
-        copy.Position = 0;
-        return copy;
-    }
+    // The whole file, since the tokenizer and ONNX Runtime both want a seekable stream or bytes, checked against meta.json
+    private Task<MemoryStream> ReadAsync(string name, JsonElement meta, CancellationToken cancellationToken) =>
+        ModelFiles.ReadAsync(storage, $"{Prefix}/{name}", ModelFiles.Checksum(meta, name), "toxicity model file", cancellationToken);
 
     public void Dispose()
     {
