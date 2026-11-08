@@ -28,6 +28,7 @@ dev users on startup, and serves the OpenAPI document.
 | `Media` | ✓ | ✓ | | `MaxUploadBytes` 20 MB, `MaxPerPost` 4, URL lifetimes |
 | `Moderation` | ✓ | ✓ | ✓ | `BlockedTerms`, toxicity thresholds, `ReportsToHold` 3, `NudityRejectAt` 0.8 |
 | `MalwareScanning` | shown | ✓ | | `Enabled`, `ClamAv:Host`/`Port` |
+| `Topics` | ✓ | | ✓ | `Keywords`: topic name to keywords, replacing the built-in wellness topics, until staff save their own ([`/admin/topics`](/api/#topics-ranking-admin)); `Enabled` |
 | `Feed` | ✓ | ✓ | ✓ | `MaxLength` 500 entries per timeline |
 | `Ranking` | ✓ | | ✓ | `DefaultProfile` `balanced` |
 | `Kafka` | | ✓ | | `BootstrapServers`, one consumer group per job, `Partitions` 3, `ReplicationFactor` 3, `Security` for SASL/TLS |

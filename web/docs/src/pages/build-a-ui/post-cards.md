@@ -16,36 +16,44 @@ description: Rendering a feed post (reposts, held posts, tags, photos), the acti
 | `tags` | Chips linking to the tag feed. `source` is `hashtag` or `inferred`; you might show only hashtags in the text and inferred topics as subtle chips. |
 | `media` | Up to four photos. Show `thumbnailUrl` in the card and `url` when opened; `width`/`height` give the aspect ratio before they load. URLs expire after an hour. |
 | `ranking` (For You only) | *Why this post?*, and an "exploring" note when `explored` is true. |
+| `likes`, `comments`, `reposts`, `liked`, `reposted` | Counts next to the actions, and the Like and Repost buttons pressed when the member has. On a repost, read them from `repostOf`. |
 
-There are no counts or "liked by me" on feed posts ([why](/build-a-ui/#know-the-apis-shape-first)); track the
-member's own likes and reposts in the client.
+Feed posts say how many likes, comments and reposts they have, and whether the member has liked or reposted them.
+The same post can be in a feed twice, as itself and as what someone's repost shares, so keep the member's changes in
+one place by post ID and read from there, falling back to what the feed said.
 
 ## Engagement state
 
 ```ts
-// src/stores/engagement.ts: what this member did, so buttons show it. PUT/DELETE are idempotent,
-// so an optimistic toggle that races another tab never doubles anything.
+// src/stores/engagement.ts: the member's likes and reposts since the feed loaded, by post ID, over what the feed
+// said. Shown at once and put back if the API says no; PUT/DELETE are idempotent, so racing another tab never
+// doubles anything.
 import { reactive } from 'vue'
 import { api } from '../api'
+import type { FeedPost } from '../types'
 
-const liked = reactive(new Set<string>())
-const reposted = reactive(new Set<string>())
+interface State { on: boolean; count: number }
+const likes = reactive(new Map<string, State>())
+const reposts = reactive(new Map<string, State>())
 
-async function toggle(set: Set<string>, postId: string, on: () => Promise<void>, off: () => Promise<void>) {
-  const was = set.has(postId)
-  was ? set.delete(postId) : set.add(postId)
+const read = (map: Map<string, State>, post: FeedPost, on: boolean, count: number) => map.get(post.id) ?? { on, count }
+
+async function toggle(map: Map<string, State>, post: FeedPost, was: State, on: () => Promise<void>, off: () => Promise<void>) {
+  map.set(post.id, { on: !was.on, count: was.count + (was.on ? -1 : 1) })
   try {
-    await (was ? off() : on())
+    await (was.on ? off() : on())
   } catch (e) {
-    was ? set.add(postId) : set.delete(postId)   // put it back
+    map.set(post.id, was)   // put it back
     throw e
   }
 }
 
 export const engagement = {
-  liked, reposted,
-  toggleLike: (postId: string) => toggle(liked, postId, () => api.like(postId), () => api.unlike(postId)),
-  toggleRepost: (postId: string) => toggle(reposted, postId, () => api.repost(postId), () => api.unrepost(postId)),
+  like: (post: FeedPost) => read(likes, post, post.liked, post.likes),
+  repost: (post: FeedPost) => read(reposts, post, post.reposted, post.reposts),
+  toggleLike: (post: FeedPost) => toggle(likes, post, engagement.like(post), () => api.like(post.id), () => api.unlike(post.id)),
+  toggleRepost: (post: FeedPost) =>
+    toggle(reposts, post, engagement.repost(post), () => api.repost(post.id), () => api.unrepost(post.id)),
 }
 ```
 
@@ -117,8 +125,8 @@ const repostedBy = computed(() => (props.post.repostOf ? props.post.authorUserna
 const root = ref<InstanceType<typeof FabricCard>>()
 useImpression(root, () => shown.value.id)
 
-const liked = computed(() => engagement.liked.has(shown.value.id))
-const reposted = computed(() => engagement.reposted.has(shown.value.id))
+const like = computed(() => engagement.like(shown.value))
+const repost = computed(() => engagement.repost(shown.value))
 const run = (action: () => Promise<unknown>) => action().catch(e => toast({ title: describe(e), tone: 'bad' }))
 const reportOpen = ref(false)
 
@@ -163,12 +171,14 @@ const menu = computed<MenuAction[]>(() => [
     </FabricStack>
 
     <FabricStack direction="row" :gap="1" class="actions">
-      <FabricButton variant="ghost" size="sm" icon="heart" :aria-pressed="liked" @click="run(() => engagement.toggleLike(shown.id))">
-        {{ liked ? 'Liked' : 'Like' }}
+      <FabricButton variant="ghost" size="sm" icon="heart" :aria-pressed="like.on" @click="run(() => engagement.toggleLike(shown))">
+        {{ like.on ? 'Liked' : 'Like' }} · {{ like.count }}
       </FabricButton>
-      <FabricButton variant="ghost" size="sm" icon="message" :to="{ name: 'post', params: { id: shown.id } }">Comment</FabricButton>
-      <FabricButton variant="ghost" size="sm" icon="repeat" :aria-pressed="reposted" :disabled="shown.isHeld"
-        @click="run(() => engagement.toggleRepost(shown.id))">{{ reposted ? 'Reposted' : 'Repost' }}</FabricButton>
+      <FabricButton variant="ghost" size="sm" icon="message" :to="{ name: 'post', params: { id: shown.id } }">
+        Comment · {{ shown.comments }}
+      </FabricButton>
+      <FabricButton variant="ghost" size="sm" icon="repeat" :aria-pressed="repost.on" :disabled="shown.isHeld"
+        @click="run(() => engagement.toggleRepost(shown))">{{ repost.on ? 'Reposted' : 'Repost' }} · {{ repost.count }}</FabricButton>
     </FabricStack>
 
     <WhyThisPost v-if="post.ranking" :ranking="post.ranking" />

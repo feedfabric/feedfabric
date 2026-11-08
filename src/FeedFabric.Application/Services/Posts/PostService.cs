@@ -9,7 +9,8 @@ using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Posts;
 
-public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<MediaOptions> mediaOptions, TextModerator moderator) : IPostService
+public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<MediaOptions> mediaOptions, TextModerator moderator, TopicRules topics)
+    : IPostService
 {
     public static readonly TimeSpan EditWindow = TimeSpan.FromHours(1);
 
@@ -55,7 +56,7 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             AuthorId = post.AuthorId,
             CreatedAt = post.CreatedAt,
         }, post.CreatedAt);
-        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt));
+        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher));
         db.PostMedia.AddRange(mediaIds.Select((id, i) => new PostMediaEntity { PostId = post.Id, MediaId = id, Position = i }));
         await db.AddMentionsAsync(post.AuthorId, post.Id, null, post.Content, post.CreatedAt, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -104,7 +105,7 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
 
         // New text, new tags. Mentions that were removed go; new ones are added and announced.
         db.PostTags.RemoveRange(await db.PostTags.Where(t => t.PostId == post.Id).ToListAsync(cancellationToken));
-        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt));
+        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher));
         var usernames = TextTokens.Mentions(post.Content);
         db.Mentions.RemoveRange(await db.Mentions
             .Where(m => m.PostId == post.Id && m.CommentId == null

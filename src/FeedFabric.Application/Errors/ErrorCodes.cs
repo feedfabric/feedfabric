@@ -63,6 +63,14 @@ public static class ErrorCodes
     // Keys are 2-40 lowercase letters, digits and dashes, starting with a letter
     public const string ProfileInvalidKey = "profile.invalid_key";
 
+    // Topics
+    // A topic name that can't be a tag, a topic with no keywords, or too many; "errors" lists each { topic, message }
+    public const string TopicsInvalid = "topics.invalid";
+    // Not one of the library's sets; params: { library }
+    public const string TopicsUnknownLibrary = "topics.unknown_library";
+    // No saved set with that version; params: { version }
+    public const string TopicsVersionNotFound = "topics.version_not_found";
+
     // Field codes inside validation_failed "errors".
     // Validation attributes put them in ErrorMessage, with params as ";name={n}" placeholders.
     public const string Required = "required";

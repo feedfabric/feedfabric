@@ -40,6 +40,9 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `profile.read_only` | 409 | `profile` | Presets can't be changed or deleted; save a copy under a new key |
 | `profile.invalid` | 400 | | Settings out of range or a formula that doesn't parse; `errors` lists each `{ field, message, position? }` |
 | `profile.invalid_key` | 400 | `profile` | Keys are 2–40 lowercase letters, digits and dashes, starting with a letter |
+| `topics.invalid` | 400 | | A topic name that can't be a tag, a topic with no keywords, or too many topics or keywords; `errors` lists each `{ topic, message }`, with `topic` empty for the set as a whole |
+| `topics.unknown_library` | 400 | `library` | Not one of the sets in `GET /admin/topics/library` |
+| `topics.version_not_found` | 404 | `version` | No saved topic set with that version |
 | `user.not_found` | 404 | `externalUserId` | No user with that ID, e.g. when following |
 | `follow.self` | 400 | | Users can't follow themselves |
 | `favourite.self` | 400 | | Users can't make themselves a favourite |

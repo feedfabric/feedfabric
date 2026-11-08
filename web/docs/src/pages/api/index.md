@@ -41,7 +41,8 @@ error codes it returns.
 | <span class="m">GET</span> | `/userfeed` | Your own posts, in the bare post shape | `limit`, `cursor`, `order` (`newest`/`oldest`), `gt`, `gte`, `lt`, `lte` (post IDs) | |
 
 Feed responses are `{ posts, nextCursor, source }` (Following, favourites, tags) or
-`{ posts, nextCursor, ranker, profile, candidates }` (For You). See [Feeds and paging](/build-a-ui/feeds/) and the
+`{ posts, nextCursor, ranker, profile, candidates }` (For You). Each post has `likes`, `comments` and `reposts`, and
+`liked` and `reposted` for the signed-in member (on a repost, on its `repostOf`). See [Feeds and paging](/build-a-ui/feeds/) and the
 [types](/build-a-ui/api-client/#types).
 
 ## Posts
@@ -127,6 +128,20 @@ hands them out. See [Photos](/how-it-works/media/) and [Composing with photos](/
 
 See [Ranking profiles](/how-it-works/profiles/).
 
+## Topics <small>(ranking admin)</small>
+
+| | Route | Purpose | Errors |
+|---|---|---|---|
+| <span class="m">GET</span> | `/admin/topics` | The set in use: `{ source, version, library, savedAt, savedBy, topics }`; `source` is `saved`, `configuration`, `default` or `off` | |
+| <span class="m">GET</span> | `/admin/topics/library` | Ready-made sets to start from: `[{ key, name, description, keywords }]` | |
+| <span class="m">GET</span> | `/admin/topics/versions` | Every saved set, newest first: `[{ version, savedAt, savedBy, library, topics }]`, `topics` being how many | |
+| <span class="m">GET</span> | `/admin/topics/versions/{n}` | One saved set: topic name to keywords | `404 topics.version_not_found` |
+| <span class="m put">PUT</span> | `/admin/topics` | Save `{ topics, library? }` as a new version and use it; empty `topics` means hashtags only | `400 topics.invalid`, `400 topics.unknown_library` |
+| <span class="m post">POST</span> | `/admin/topics/preview` | The topics `{ text, topics? }` would get, from the draft `topics` or the set in use: `[{ topic, confidence }]` | `400 topics.invalid` |
+
+New and edited posts use a saved set within a minute; posts already tagged keep their tags. See
+[Tags and mentions](/how-it-works/posting/#tags-and-mentions).
+
 ## Moderation <small>(moderator)</small>
 
 | | Route | Purpose | Errors |
@@ -154,6 +169,9 @@ See [Ranking profiles](/how-it-works/profiles/).
 | <span class="m">GET</span> | `/admin/system` | Sign-in settings (no secrets), moderation thresholds, media limits, models, ranker, users by status, outbox and consumers |
 | <span class="m">GET</span> | `/admin/feed/{externalUserId}/following` | A member's Following as they'd see it, without logging it |
 | <span class="m">GET</span> | `/admin/feed/{externalUserId}/foryou?profile=` | A member's For You in a session of its own, without logging it |
+
+On the two `/admin/feed` routes and `/ranking/preview`, `liked` and `reposted` are yours, not the member's: they're for
+acting on the posts as yourself.
 
 ## Other
 

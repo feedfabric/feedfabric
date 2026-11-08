@@ -530,6 +530,38 @@ namespace FeedFabric.Application.Migrations
                     b.ToTable("PostTags");
                 });
 
+            modelBuilder.Entity("FeedFabric.Application.Services.Tags.TopicSetEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Library")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("SavedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SavedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Topics")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Version")
+                        .IsUnique();
+
+                    b.ToTable("TopicSets");
+                });
+
             modelBuilder.Entity("FeedFabric.Application.Services.Users.UserEntity", b =>
                 {
                     b.Property<Guid>("Id")

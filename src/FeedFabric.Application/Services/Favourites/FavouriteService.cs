@@ -86,6 +86,7 @@ public class FavouriteService(AppDbContext db, IMediaService media, FeatureBuild
         var found = await posts.OrderByDescending(p => p.Id).ToFeedPosts(db).Take(query.Limit + 1).ToListAsync(cancellationToken);
         var page = found.Take(query.Limit).ToList();
         await page.AttachRepostsAsync(db, cancellationToken);
+        await page.AttachEngagementAsync(db, userId, cancellationToken);
         await page.AttachMediaAsync(media, cancellationToken);
 
         var shown = page.Select(p => p.RepostOf ?? p).ToList();

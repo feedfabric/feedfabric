@@ -37,6 +37,44 @@ public static class FeedPostQueries
         }
     }
 
+    // Fills in the counts, and Liked and Reposted for `signedIn`, on each post that can be liked: the posts themselves,
+    // or for a repost the post it shares, so call it after AttachRepostsAsync. A few grouped queries per page.
+    public static async Task AttachEngagementAsync(this IReadOnlyList<HomeFeedPostResponse> posts, AppDbContext db, Guid? signedIn,
+        CancellationToken cancellationToken)
+    {
+        var shown = posts.Select(p => p.RepostOfId is null ? p : p.RepostOf).OfType<HomeFeedPostResponse>().ToList();
+        var ids = shown.Select(p => p.Id).Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        var likes = await db.Likes.Where(l => ids.Contains(l.PostId))
+            .GroupBy(l => l.PostId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, cancellationToken);
+        var comments = await db.Comments.Where(c => ids.Contains(c.PostId) && c.DeletedAt == null
+                && (c.Status == ContentStatus.Visible || (c.Status == ContentStatus.Held && c.AuthorId == signedIn)))
+            .GroupBy(c => c.PostId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, cancellationToken);
+        var reposts = await db.Posts.Where(r => r.RepostOfId != null && ids.Contains(r.RepostOfId.Value) && r.DeletedAt == null)
+            .GroupBy(r => r.RepostOfId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, cancellationToken);
+        HashSet<Guid> liked = [];
+        HashSet<Guid> reposted = [];
+        if (signedIn is { } userId)
+        {
+            liked = [.. await db.Likes.Where(l => l.UserId == userId && ids.Contains(l.PostId)).Select(l => l.PostId).ToListAsync(cancellationToken)];
+            reposted = [.. await db.Posts.Where(r => r.AuthorId == userId && r.RepostOfId != null && ids.Contains(r.RepostOfId.Value) && r.DeletedAt == null)
+                .Select(r => r.RepostOfId!.Value).ToListAsync(cancellationToken)];
+        }
+
+        foreach (var post in shown)
+        {
+            post.Likes = likes.GetValueOrDefault(post.Id);
+            post.Comments = comments.GetValueOrDefault(post.Id);
+            post.Reposts = reposts.GetValueOrDefault(post.Id);
+            post.Liked = liked.Contains(post.Id);
+            post.Reposted = reposted.Contains(post.Id);
+        }
+    }
+
     // Signs fresh URLs for each post's images, reposted ones included; done after the query since signing can't happen in SQL
     public static async Task AttachMediaAsync(this IReadOnlyList<HomeFeedPostResponse> posts, IMediaService media, CancellationToken cancellationToken)
     {

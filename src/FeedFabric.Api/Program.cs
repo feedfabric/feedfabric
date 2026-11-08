@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -102,6 +100,8 @@ builder.Services.AddSingleton<RankerModel>();
 builder.Services.Configure<ModerationOptions>(builder.Configuration.GetSection(ModerationOptions.Section));
 builder.Services.AddSingleton<ToxicityClassifier>();
 builder.Services.AddSingleton<TextModerator>();
+// Topics inferred from wording (Topics:Keywords, or the built-in wellness ones)
+builder.Services.AddTopics(builder.Configuration);
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<AdminUserService>();
@@ -165,7 +165,7 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
-    await TagBackfill.RunAsync(db, app.Logger);
+    await TagBackfill.RunAsync(db, scope.ServiceProvider.GetRequiredService<TopicRules>(), app.Logger);
 }
 
 if (!app.Environment.IsDevelopment() && app.Configuration["AllowedHosts"] is null or "*")
@@ -227,4 +227,3 @@ app.MapGet("/me", (ICurrentUser currentUser) => new { currentUser.ExternalUserId
 
 await app.RunAsync();
 return 0;
-public partial class Program;

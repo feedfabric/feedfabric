@@ -29,7 +29,6 @@ it rather than discovering it later:
 | Not in the API | What to do |
 |---|---|
 | A single-post `GET` | A post page renders the post you navigated from (keep it in a store or pass it in router state), then loads its comments with `GET /userfeed/posts/{id}/comments`. |
-| Like, comment or repost counts on feed posts, or "liked by me" | Track what the member did this session yourself; `PUT`/`DELETE` are idempotent, so a wrong guess never doubles anything. For You posts carry `likes` and `comments` in `ranking.features` as they were when ranked. |
 | User profiles, search, follower lists, "do I follow them?" | Follows and favourites are fire-and-forget `PUT`/`DELETE` by `externalUserId`. `GET /favourites` lists favourites; nothing lists follows. Profile pages need your own user service. |
 | Notifications | `GET /userfeed/mentions` lists @mentions; poll it. |
 | CORS | Off unless configured. Serve your app from the same origin as the API (a reverse proxy in production, Vite's proxy in development), or list its origin in the API's `Cors:AllowedOrigins`. |

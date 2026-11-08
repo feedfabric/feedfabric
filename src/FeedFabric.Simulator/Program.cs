@@ -10,6 +10,7 @@ using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Ranking.Profiles;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Storage;
+using FeedFabric.Application.Services.Tags;
 using StackExchange.Redis;
 using FeedFabric.Simulator;
 
@@ -38,6 +39,8 @@ builder.Services.AddSingleton<RankerModel>();
 builder.Services.Configure<ModerationOptions>(builder.Configuration.GetSection(ModerationOptions.Section));
 builder.Services.AddSingleton<ToxicityClassifier>();
 builder.Services.AddSingleton<TextModerator>();
+// Topics inferred from wording (Topics:Keywords, or the built-in wellness ones)
+builder.Services.AddTopics(builder.Configuration);
 builder.Services.AddScoped<EmbeddingStore>();
 // The last day's post embeddings in memory, for meaning-based candidates
 builder.Services.AddSingleton<EmbeddingIndex>();

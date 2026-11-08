@@ -55,6 +55,9 @@ in `src/FeedFabric.Application/Errors/ErrorCodes.cs`; the repository's `docs/err
 | `profile.read_only` | 409 | `profile` | Presets can't be changed or deleted | `PUT`/`DELETE /ranking/profiles/{key}` |
 | `profile.invalid` | 400 | | Settings out of range, or a formula that doesn't parse; `errors` lists `{ field, message, position? }` | `PUT /ranking/profiles/{key}`, `/ranking/preview` |
 | `profile.invalid_key` | 400 | `profile` | Keys are 2–40 lowercase letters, digits and dashes, starting with a letter | `PUT /ranking/profiles/{key}` |
+| `topics.invalid` | 400 | | A name that can't be a tag, a topic with no keywords, or too many; `errors` lists `{ topic, message }` | `PUT /admin/topics`, `/admin/topics/preview` |
+| `topics.unknown_library` | 400 | `library` | Not one of the library's sets | `PUT /admin/topics` |
+| `topics.version_not_found` | 404 | `version` | No saved topic set with that version | `GET /admin/topics/versions/{n}` |
 | `bad_request` | 400 | | Generic fallback | |
 | `unauthorized` | 401 | | Missing or invalid token | Every route |
 | `forbidden` | 403 | | Missing role (generic fallback) | Staff routes |

@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using FeedFabric.Application.Errors;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Tags;
+using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("userfeed/tags")]
-public class TagsController(ITagService tagService) : ControllerBase
+public class TagsController(ITagService tagService, ICurrentUser currentUser) : ControllerBase
 {
     // GET /userfeed/tags/trending?hours=24&limit=10: tags on the most recent posts, hashtags and inferred topics alike
     [HttpGet("trending")]
@@ -23,5 +24,5 @@ public class TagsController(ITagService tagService) : ControllerBase
     // GET /userfeed/tags/{tag}/posts?limit=20, then add &cursor=<nextCursor>; newest first
     [HttpGet("{tag}/posts")]
     public async Task<ActionResult<HomeFeedResponse>> Posts(string tag, [FromQuery] HomeFeedQuery query, CancellationToken cancellationToken) =>
-        Ok(await tagService.PostsAsync(tag, query, cancellationToken));
+        Ok(await tagService.PostsAsync(tag, currentUser.ExternalUserId, query, cancellationToken));
 }

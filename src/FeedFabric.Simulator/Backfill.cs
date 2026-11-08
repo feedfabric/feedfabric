@@ -6,6 +6,7 @@ using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Posts;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Safety;
+using FeedFabric.Application.Services.Tags;
 using StackExchange.Redis;
 
 namespace FeedFabric.Simulator;
@@ -20,6 +21,7 @@ public class Backfill(
     IOptions<SimulatorOptions> options,
     IOptions<MediaOptions> mediaOptions,
     TextModerator moderator,
+    TopicRules topics,
     IConnectionMultiplexer redis,
     TimeProvider timeProvider,
     ILogger<Backfill> logger)
@@ -51,7 +53,7 @@ public class Backfill(
                 using var scope = scopes.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var feedLog = new FeedLog(db, redis, clock);
-                var posts = new PostService(db, clock, mediaOptions, moderator);
+                var posts = new PostService(db, clock, mediaOptions, moderator, topics);
                 var commentService = new CommentService(db, feedLog, moderator, clock);
                 var likeService = new LikeService(db, feedLog, clock);
 

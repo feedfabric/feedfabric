@@ -17,7 +17,7 @@ one provider to the next.
 | Avatar | `Auth:Claims:Avatar` | `picture` | |
 | Roles | `Auth:Claims:Roles` | `roles`, `role`, `permissions` | Every claim listed is read. A dotted path reads into a JSON claim, e.g. `realm_access.roles`. |
 | Which roles are moderators | `Auth:Roles:Moderator` | `moderator` | Your role names. Moderators use the admin app and `/admin/moderation`. |
-| Which roles manage ranking | `Auth:Roles:RankingAdmin` | `ranking-admin` | Saving ranking profiles changes everyone's feed. |
+| Which roles manage ranking | `Auth:Roles:RankingAdmin` | `ranking-admin` | Saving ranking profiles or topics (`/admin/topics`) changes everyone's feed. |
 
 Lists you set replace the defaults; they're never added to them.
 
