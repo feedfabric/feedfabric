@@ -40,6 +40,8 @@
 - **Events through an outbox to Kafka**, with idempotent consumers and separate consumer groups for fan-out, engagement, media and embeddings.
 - **Pluggable blob storage:** local disk in development, or any S3-compatible service (S3, R2, MinIO, LocalStack).
 - **A simulator** that populates the system with 1,000 users, British English conversations and realistic reading behaviour.
+- **Server SDKs and API keys.** Your own servers call FeedFabric for your members with a key from the admin panel, through clients for TypeScript, Python, Go, C#, Java, PHP and Ruby ([sdks/](sdks/README.md)).
+- **Your own data on posts.** App tags, and typed data (a weight reading, a finished book) checked against a JSON Schema you register, and typed end to end in every SDK.
 - **An admin panel** for running it: a live dashboard, a review queue, reports, the moderation log, users and posts (suspend, verify, approve, remove), the Feed studio, and the server's settings and models.
 
 ## Architecture
@@ -123,7 +125,9 @@ All routes need a bearer token from your identity provider: Auth0, Entra ID, Cog
 | Reports | `POST /userfeed/posts/{id}/report`, `POST /userfeed/comments/{id}/report` |
 | Moderation (`moderator` role) | `GET /admin/moderation/overview`, `/queue`, `/reports`, `/log`; `POST /admin/moderation/posts/{id}/decision`, `/comments/{id}/decision` |
 | Users and posts (`moderator` role) | `GET /admin/users`, `GET /admin/users/{externalUserId}`, `PUT /admin/users/{externalUserId}/status`, `PUT /admin/users/{externalUserId}/verified`, `GET /admin/posts`, `GET /admin/posts/{id}` |
-| Staff (`moderator` or `ranking-admin`) | `GET /admin/me`, `GET /admin/dashboard`, `GET /admin/system` |
+| Staff (`moderator`, `ranking-admin` or `integration-admin`) | `GET /admin/me`, `GET /admin/dashboard`, `GET /admin/system` |
+| Integrations (`integration-admin` role) | `GET`/`POST /admin/api-keys`, `DELETE /admin/api-keys/{id}`, `PUT`/`DELETE /admin/data-types/{key}` |
+| Data types | `GET /data-types`, `GET /data-types/{key}`, `GET /data-types/{key}/schema` |
 | Signals | `POST /userfeed/impressions`, `POST /userfeed/dwell`, `POST /userfeed/posts/{id}/open`, `POST /userfeed/posts/{id}/not-interested`, `POST /userfeed/posts/{id}/show-more` |
 | Tags and mentions | `GET /userfeed/tags/trending`, `GET /userfeed/tags/{tag}/posts`, `GET /userfeed/mentions` |
 | Follows | `PUT`/`DELETE /follows/{externalUserId}` |
@@ -205,6 +209,7 @@ Each simulated user has a main interest and one or two secondary interests. Then
 - [Configuration](docs/configuration.md): every setting and environment variable, and which service reads it
 - [Data model](docs/data-model.md): every entity and field, and the event flow
 - [API errors](docs/errors.md): codes, statuses and validation errors
+- [SDKs](sdks/README.md): API keys, the client libraries, tags and typed data
 - [Deploying](docs/deploying.md): the images, the order to roll them out, health checks and scaling
 - [Runbooks](docs/runbooks.md): rollback, dead-lettered events, rebuilding timelines, swapping models, the moderation backlog
 - [Data retention](docs/data-retention.md): what is kept, for how long, and what deleting an account leaves

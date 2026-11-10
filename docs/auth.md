@@ -18,6 +18,7 @@ one provider to the next.
 | Roles | `Auth:Claims:Roles` | `roles`, `role`, `permissions` | Every claim listed is read. A dotted path reads into a JSON claim, e.g. `realm_access.roles`. |
 | Which roles are moderators | `Auth:Roles:Moderator` | `moderator` | Your role names. Moderators use the admin app and `/admin/moderation`. |
 | Which roles manage ranking | `Auth:Roles:RankingAdmin` | `ranking-admin` | Saving ranking profiles or topics (`/admin/topics`) changes everyone's feed. |
+| Which roles manage integrations | `Auth:Roles:IntegrationAdmin` | `integration-admin` | API keys for your servers, and the data types posts can carry. |
 
 Lists you set replace the defaults; they're never added to them.
 
@@ -77,6 +78,34 @@ way as a hosted provider. Point the Authority at it, and map whatever claims it 
   a token meant for another of your APIs isn't accepted here. If your tokens only carry one shared audience, use that.
 - **Moderators.** If you have no moderator role yet, map the staff roles that already moderate elsewhere, or add one.
 - **Names.** If your tokens carry no username, users appear as `user_<their ID>` until a token has one.
+
+## API keys for your servers
+
+Your own servers can call FeedFabric for your members, without a token for each member. An integration admin makes
+a key in the admin panel (Integrations → API keys, or `POST /admin/api-keys { "name": "…" }`), and the server sends
+it with the member it's acting for:
+
+```http
+Authorization: Bearer ffk_…
+FeedFabric-User: auth0%7C65f…
+FeedFabric-Username: maya_runs
+FeedFabric-Display-Name: Maya
+```
+
+- `FeedFabric-User` is the member's ID, the same one their tokens carry in `Auth:Claims:UserId`, so a member is one
+  person however they arrive. A key without one is `401 api_key.user_required`.
+- `FeedFabric-Username`, `FeedFabric-Display-Name` and `FeedFabric-Avatar` are optional. They are the profile used
+  when the member is first seen, refreshed like a token's (`Auth:ProfileRefresh`).
+- Every header value is percent-encoded (UTF-8), so names in any script survive.
+- **A key can only do what a member can.** It carries no roles, and every staff route refuses it, in Development
+  too. Keep it on your servers: anyone holding it can act as any member.
+- The key is shown once. FeedFabric keeps only its SHA-256 hash, its first characters (to tell keys apart), when it
+  was made and by whom, and when it was last used.
+- Revoking a key (`DELETE /admin/api-keys/{id}`) stops it at once on the server that handled the revoke, and within a
+  minute everywhere else.
+
+[sdks/](../sdks/README.md) has client libraries that do all of this for you, for TypeScript, Python, Go, C#, Java,
+PHP and Ruby.
 
 ## The admin app
 
