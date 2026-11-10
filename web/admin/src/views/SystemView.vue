@@ -59,6 +59,7 @@ const limits = (values: Record<string, number>) => Object.entries(values).map(([
         <dt>Role claims</dt><dd><code v-for="r in info.auth.claims.roles" :key="r">{{ r }}</code></dd>
         <dt>Moderator roles</dt><dd><code v-for="r in info.auth.roles.moderator" :key="r">{{ r }}</code></dd>
         <dt>Ranking roles</dt><dd><code v-for="r in info.auth.roles.rankingAdmin" :key="r">{{ r }}</code></dd>
+        <dt>Integration roles</dt><dd><code v-for="r in info.auth.roles.integrationAdmin" :key="r">{{ r }}</code></dd>
         <dt>New users</dt><dd>{{ info.auth.provisionUsers ? 'Created on their first request' : 'Created by your system' }}</dd>
       </dl>
     </section>

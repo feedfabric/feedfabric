@@ -71,6 +71,28 @@ public static class ErrorCodes
     // No saved set with that version; params: { version }
     public const string TopicsVersionNotFound = "topics.version_not_found";
 
+    // Post data
+    // data.type isn't a registered data type; params: { type }
+    public const string PostDataTypeUnknown = "post.data_type_unknown";
+    // The data is over the size limit; params: { maxBytes }
+    public const string PostDataTooLarge = "post.data_too_large";
+    // The data doesn't match its type's schema; "errors" lists each { path, message }
+    public const string PostDataInvalid = "post.data_invalid";
+
+    // Data types
+    // No data type with that key; params: { type }
+    public const string DataTypeNotFound = "data_type.not_found";
+    // Keys are 2-40 lowercase letters, digits and dashes, starting with a letter; params: { type }
+    public const string DataTypeInvalidKey = "data_type.invalid_key";
+    // Not a JSON Schema, or its root isn't an object; params: { reason }
+    public const string DataTypeInvalidSchema = "data_type.invalid_schema";
+
+    // API keys
+    // No key with that ID
+    public const string ApiKeyNotFound = "api_key.not_found";
+    // An API key acts for a member, so it needs the FeedFabric-User header; params: { header }
+    public const string ApiKeyUserRequired = "api_key.user_required";
+
     // Field codes inside validation_failed "errors".
     // Validation attributes put them in ErrorMessage, with params as ";name={n}" placeholders.
     public const string Required = "required";

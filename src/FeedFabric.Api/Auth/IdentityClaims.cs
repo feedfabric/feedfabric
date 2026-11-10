@@ -16,6 +16,9 @@ public sealed class IdentityClaims(IOptions<AuthOptions> options) : IClaimsTrans
     public const string DisplayName = "ff:name";
     public const string Avatar = "ff:avatar";
     public const string Role = "ff:role";
+
+    // Set when the call came with an API key (ApiKeyAuthenticationHandler): the key's ID
+    public const string ApiKey = "ff:apikey";
     private const string Prefix = "ff:";
 
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -61,10 +64,16 @@ public sealed class IdentityClaims(IOptions<AuthOptions> options) : IClaimsTrans
         {
             identity.AddClaim(new Claim(Role, RankingPolicies.AdminRole));
         }
+        if (roles.IntegrationAdminOrDefault.Any(theirs.Contains))
+        {
+            identity.AddClaim(new Claim(Role, AdminPolicies.IntegrationAdminRole));
+        }
 
         principal.AddIdentity(identity);
         return Task.FromResult(principal);
     }
+
+    public static bool IsApiKey(ClaimsPrincipal principal) => principal.HasClaim(c => c.Type == ApiKey);
 
     private static void Add(ClaimsIdentity identity, string type, string? value)
     {

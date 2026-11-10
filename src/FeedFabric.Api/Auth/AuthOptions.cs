@@ -88,7 +88,12 @@ public class RoleNames
 
     public List<string> RankingAdmin { get; set; } = [];
 
+    // API keys and post data types: a key can act for any member
+    public List<string> IntegrationAdmin { get; set; } = [];
+
     public IReadOnlyList<string> ModeratorOrDefault => Moderator.Count > 0 ? Moderator : [ModerationPolicies.ReviewerRole];
 
     public IReadOnlyList<string> RankingAdminOrDefault => RankingAdmin.Count > 0 ? RankingAdmin : [RankingPolicies.AdminRole];
+
+    public IReadOnlyList<string> IntegrationAdminOrDefault => IntegrationAdmin.Count > 0 ? IntegrationAdmin : [AdminPolicies.IntegrationAdminRole];
 }

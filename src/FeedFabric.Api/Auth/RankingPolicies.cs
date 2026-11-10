@@ -13,6 +13,8 @@ public static class RankingPolicies
         builder.AddPolicy(Admin, policy =>
         {
             policy.RequireAuthenticatedUser();
+            // API keys act for members, never staff, in Development too
+            policy.RequireAssertion(context => !IdentityClaims.IsApiKey(context.User));
             if (!environment.IsDevelopment())
             {
                 // Mapped from the host's own role names by IdentityClaims (AuthOptions.Roles)

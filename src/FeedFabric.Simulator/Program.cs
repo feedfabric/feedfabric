@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Impressions;
 using FeedFabric.Application.Services.Likes;
@@ -20,6 +21,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<DataTypeStore>();
 builder.Services.AddScoped<ILikeService, LikeService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<IHomeFeedService, HomeFeedService>();

@@ -25,6 +25,10 @@ public class FeedQuery
 
     public FeedOrder Order {get;set;} = FeedOrder.Newest;
 
+    // Only posts with data of this type (GET /data-types), e.g. "weight-reading"
+    [MaxLength(40, ErrorMessage = ErrorCodes.TooLong + ";max={1}")]
+    public string? Type {get;set;}
+
     [Range(1, 100, ErrorMessage = ErrorCodes.OutOfRange + ";min={1};max={2}")]
     public int Limit {get;set;} = 20;
 }

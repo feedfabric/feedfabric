@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using FeedFabric.Application.Services.ApiKeys;
 
 namespace FeedFabric.Api.Auth;
 
@@ -9,7 +10,10 @@ public static class AuthServiceCollectionExtensions
 {
     // "Dev" mode only in Development: any token or X-Dev-User is trusted. Anywhere else the host's tokens are checked:
     // against its OpenID Connect keys (Auth:Jwt:Authority) or its shared secret (Auth:Jwt:SigningKey), for
-    // Auth:Jwt:Audience. Either way IdentityClaims maps the token's claims to FeedFabric's.
+    // Auth:Jwt:Audience. Either way IdentityClaims maps the token's claims to FeedFabric's. In every mode, a bearer
+    // "ffk_…" is an API key from the admin panel instead (ApiKeyAuthenticationHandler).
+    public const string SchemeName = "FeedFabric";
+
     public static IServiceCollection AddFeedFabricAuth(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var section = configuration.GetSection(AuthOptions.Section);
@@ -17,6 +21,7 @@ public static class AuthServiceCollectionExtensions
         var options = section.Get<AuthOptions>() ?? new AuthOptions();
         services.AddMemoryCache();
         services.AddTransient<IClaimsTransformation, IdentityClaims>();
+        services.AddScoped<ApiKeyStore>();
 
         if (options.Mode.Equals(AuthModes.Dev, StringComparison.OrdinalIgnoreCase))
         {
@@ -24,7 +29,7 @@ public static class AuthServiceCollectionExtensions
             {
                 throw new InvalidOperationException("Auth:Mode \"Dev\" trusts any token without checking it, so it only runs in Development.");
             }
-            services.AddAuthentication(DevAuthenticationHandler.SchemeName)
+            AddSchemes(services, DevAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(DevAuthenticationHandler.SchemeName, null);
             return services;
         }
@@ -40,7 +45,7 @@ public static class AuthServiceCollectionExtensions
             throw new InvalidOperationException("Auth:Jwt:SigningKey needs an Issuer, and must be at least 32 bytes.");
         }
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        AddSchemes(services, JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(bearer =>
             {
                 // Keep claim names as the token has them, so AuthOptions.Claims matches what the provider documents
@@ -86,4 +91,11 @@ public static class AuthServiceCollectionExtensions
             });
         return services;
     }
+
+    // Sign-in tokens go to the mode's own scheme, API keys to theirs
+    private static AuthenticationBuilder AddSchemes(IServiceCollection services, string tokenScheme) =>
+        services.AddAuthentication(SchemeName)
+            .AddPolicyScheme(SchemeName, null, policy => policy.ForwardDefaultSelector = context =>
+                ApiKeyAuthenticationHandler.HasKey(context.Request) ? ApiKeyAuthenticationHandler.SchemeName : tokenScheme)
+            .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, null);
 }

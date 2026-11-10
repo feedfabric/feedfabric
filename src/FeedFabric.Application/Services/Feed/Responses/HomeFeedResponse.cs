@@ -1,3 +1,4 @@
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Ranking;
 using FeedFabric.Application.Services.Tags;
@@ -42,6 +43,9 @@ public class HomeFeedPostResponse
 
     // Hashtags first, then inferred topics
     public IReadOnlyList<TagResponse> Tags {get;init;} = [];
+
+    // Structured data from the host's app, of a type in GET /data-types; null on most posts
+    public PostDataResponse? Data {get;init;}
 
     // Scanned, rebuilt images with short-lived URLs
     public IReadOnlyList<PostMediaResponse> Media {get;set;} = [];

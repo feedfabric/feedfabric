@@ -10,6 +10,7 @@ using FeedFabric.Api.Errors;
 using FeedFabric.Api.Hosting;
 using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services;
 using FeedFabric.Application.Services.Admin;
 using FeedFabric.Application.Services.Comments;
@@ -76,6 +77,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     return ConnectionMultiplexer.Connect(redisOptions);
 });
 builder.Services.AddScoped<IPostService, PostService>();
+// The kinds of structured data the host's apps attach to posts, each with its JSON Schema
+builder.Services.AddScoped<DataTypeStore>();
 builder.Services.AddScoped<IFollowService, FollowService>();
 builder.Services.AddScoped<IFavouriteService, FavouriteService>();
 builder.Services.AddScoped<ILikeService, LikeService>();

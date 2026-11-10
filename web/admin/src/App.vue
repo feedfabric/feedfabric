@@ -40,6 +40,14 @@ const sections = computed<SidebarSection[]>(() => [
   },
   { title: 'Ranking', show: !!me.value?.rankingAdmin, links: [{ to: '/studio', label: 'Feed studio', icon: 'sparkle' as const }] },
   {
+    title: 'Integrations',
+    show: !!me.value?.integrationAdmin,
+    links: [
+      { to: '/api-keys', label: 'API keys', icon: 'shield' as const },
+      { to: '/data-types', label: 'Data types', icon: 'filter' as const },
+    ],
+  },
+  {
     title: 'System',
     show: true,
     links: [
