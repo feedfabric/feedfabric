@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+require "minitest/test_task"
+
+Minitest::TestTask.create
+
+desc "Check the RBS signatures"
+task :rbs do
+  sh "rbs", "-r", "net-http", "-r", "uri", "-I", "sig", "validate"
+end
+
+task default: %i[test rbs]
