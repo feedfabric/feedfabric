@@ -4,7 +4,7 @@ public class TagResponse
 {
     public required string Tag { get; init; }
 
-    // "hashtag" or "inferred"
+    // "hashtag", "inferred" or "app" (TagSourceNames)
     public required string Source { get; init; }
 }
 

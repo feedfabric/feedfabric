@@ -1,0 +1,28 @@
+{
+    "name": "feedfabric/feedfabric-php",
+    "description": "Call FeedFabric from your servers, for your members, with an API key.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["feedfabric", "feed", "social"],
+    "require": {
+        "php": ">=8.1",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.4",
+        "phpstan/phpstan": "^2.3"
+    },
+    "autoload": {
+        "psr-4": { "FeedFabric\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "FeedFabric\\Tests\\": "tests/" }
+    },
+    "scripts": {
+        "test": ["phpstan analyse --no-progress", "phpunit"]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

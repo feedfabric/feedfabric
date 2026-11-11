@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Embeddings;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Impressions;
@@ -80,6 +81,8 @@ public sealed class PipelineFixture : IAsyncLifetime
             .AddScoped<IImpressionService, ImpressionService>()
             .AddScoped<IMediaService, MediaService>()
             .AddScoped<IPostService, PostService>()
+            .AddMemoryCache()
+            .AddScoped<DataTypeStore>()
             .AddScoped<ILikeService, LikeService>()
             .AddScoped<ICommentService, CommentService>()
             .AddScoped<IHomeFeedService, HomeFeedService>()

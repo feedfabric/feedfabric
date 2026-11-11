@@ -12,7 +12,8 @@ are `null` rather than missing. These match the C# response classes (`HomeFeedPo
 
 ```ts
 // src/types.ts
-export interface Tag { tag: string; source: 'hashtag' | 'inferred' }
+// 'app': set by your own server in a post's tags (see /sdks/typed-data/)
+export interface Tag { tag: string; source: 'hashtag' | 'inferred' | 'app' }
 
 // Signed, short-lived URLs (an hour by default): use as given, never store
 export interface PostMedia { id: string; url: string; thumbnailUrl: string; width: number; height: number }

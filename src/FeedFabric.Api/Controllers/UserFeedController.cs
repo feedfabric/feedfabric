@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using FeedFabric.Api.Errors;
 using FeedFabric.Api.RateLimiting;
 using FeedFabric.Application.Errors;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Feed;
 using FeedFabric.Application.Services.Posts;
@@ -19,7 +20,8 @@ namespace FeedFabric.Api.Controllers;
 public class UserFeedController(IFeedService feedService, IHomeFeedService homeFeedService, ForYouService forYouService, RankingProfileStore profiles, IPostService postService,
     IFavouriteService favourites, ICurrentUser currentUser) : ControllerBase
 {
-    // GET /userfeed?gt=&gte=&lt=&lte=&order=newest|oldest&limit=20, then add &cursor=<nextCursor> for the next page
+    // GET /userfeed?gt=&gte=&lt=&lte=&order=newest|oldest&type=&limit=20, then add &cursor=<nextCursor> for the next
+    // page: your own posts; type keeps only those with data of that type
     [HttpGet]
     public async Task<ActionResult<FeedResponse>> GetFeed([FromQuery] FeedQuery query, CancellationToken cancellationToken)
     {
@@ -66,7 +68,7 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
         var result = await postService.CreateAsync(currentUser.ExternalUserId, request, cancellationToken);
         return result.Status == PostResultStatus.Ok
             ? StatusCode(StatusCodes.Status201Created, result.Post)
-            : ToProblem(result.Status, result.Violation);
+            : ToProblem(result.Status, result.Violation, request.Data?.Type, result.DataErrors);
     }
 
     [EnableRateLimiting(RateLimitPolicies.Posting)]
@@ -74,7 +76,7 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
     public async Task<ActionResult<PostResponse>> EditPost(Guid id, PostRequest request, CancellationToken cancellationToken)
     {
         var result = await postService.EditAsync(currentUser.ExternalUserId, id, request, cancellationToken);
-        return result.Status == PostResultStatus.Ok ? Ok(result.Post) : ToProblem(result.Status, result.Violation);
+        return result.Status == PostResultStatus.Ok ? Ok(result.Post) : ToProblem(result.Status, result.Violation, request.Data?.Type, result.DataErrors);
     }
 
     [EnableRateLimiting(RateLimitPolicies.Posting)]
@@ -85,7 +87,8 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
         return result.Status == PostResultStatus.Ok ? NoContent() : ToProblem(result.Status);
     }
 
-    private ObjectResult ToProblem(PostResultStatus status, string? violation = null) => status switch
+    private ObjectResult ToProblem(PostResultStatus status, string? violation = null, string? dataType = null,
+        IReadOnlyList<DataError>? dataErrors = null) => status switch
     {
         PostResultStatus.UserNotFound => this.ApiProblem(StatusCodes.Status404NotFound, ErrorCodes.UserNotSynced,
             $"User {currentUser.ExternalUserId} has not been synced.", new { externalUserId = currentUser.ExternalUserId }),
@@ -106,6 +109,12 @@ public class UserFeedController(IFeedService feedService, IHomeFeedService homeF
             "An image wasn't found, isn't yours, or is already on another post."),
         PostResultStatus.MediaNotReady => this.ApiProblem(StatusCodes.Status409Conflict, ErrorCodes.MediaNotReady,
             "An image hasn't finished scanning, or was rejected."),
+        PostResultStatus.DataTypeUnknown => this.ApiProblem(StatusCodes.Status400BadRequest, ErrorCodes.PostDataTypeUnknown,
+            $"There's no data type called '{dataType}'. Staff add them in the admin panel.", new { type = dataType }),
+        PostResultStatus.DataTooLarge => this.ApiProblem(StatusCodes.Status400BadRequest, ErrorCodes.PostDataTooLarge,
+            $"A post's data can be at most {DataTypeStore.MaxDataBytes} bytes of JSON.", new { maxBytes = DataTypeStore.MaxDataBytes }),
+        PostResultStatus.DataInvalid => ProblemResults.Create(HttpContext, StatusCodes.Status400BadRequest, ErrorCodes.PostDataInvalid,
+            $"The data doesn't match the '{dataType}' schema.", new { type = dataType }, dataErrors),
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
     };
 }
