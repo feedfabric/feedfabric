@@ -14,7 +14,7 @@ COPY . .
 RUN dotnet ef migrations bundle --project src/FeedFabric.Application --startup-project src/FeedFabric.Application \
         --self-contained -r linux-$([ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x64) -o /out/efbundle
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS final
+FROM mcr.microsoft.com/dotnet/runtime-deps:11.0 AS final
 # Security fixes Ubuntu has published since Microsoft last rebuilt the base image (CI's Trivy scan fails on them)
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
