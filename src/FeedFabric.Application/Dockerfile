@@ -4,7 +4,7 @@
 # It applies any migrations the database doesn't have yet, each in its own transaction, and exits non-zero on
 # failure. Running it again is a no-op.
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 ARG TARGETARCH
 WORKDIR /src
 COPY ["Directory.Build.props", "global.json", "dotnet-tools.json", "./"]
