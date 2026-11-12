@@ -2,7 +2,7 @@
 #   docker build -f src/FeedFabric.Worker.Events/Dockerfile .
 
 # aspnet rather than runtime: the worker serves /health/live and /health/ready on 8080
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS base
 # librdkafka looks for the Kerberos library at startup and logs an error without it. The upgrade takes security
 # fixes Ubuntu has published since Microsoft last rebuilt the base image (CI's Trivy scan fails on them).
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
