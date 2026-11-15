@@ -70,6 +70,11 @@ type Query = Record<string, string | number | undefined>
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const withoutTrailingSlashes = (url: string) => {
+  let end = url.length
+  while (end > 0 && url[end - 1] === '/') end--
+  return url.slice(0, end)
+}
 const enc = encodeURIComponent
 
 // The SDK's entry point: one per server process, shared by every request
@@ -83,7 +88,7 @@ export class FeedFabric {
   constructor(options: FeedFabricOptions) {
     if (!options.baseUrl) throw new TypeError('FeedFabric needs a baseUrl')
     if (!options.apiKey?.startsWith('ffk_')) throw new TypeError('FeedFabric needs an API key from the admin panel ("ffk_…")')
-    this.baseUrl = options.baseUrl.replace(/\/+$/, '')
+    this.baseUrl = withoutTrailingSlashes(options.baseUrl)
     this.apiKey = options.apiKey
     this.timeoutMs = options.timeoutMs ?? 30_000
     this.maxRetries = options.maxRetries ?? 2
