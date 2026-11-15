@@ -13,6 +13,14 @@ updates:
         patterns: ["OpenTelemetry*", "Npgsql.OpenTelemetry"]
       testcontainers:
         patterns: ["Testcontainers*"]
+    ignore:
+      # The runtime-aligned packages follow the TargetFramework (Directory.Build.props); a major bump means moving it
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directories: [/web/admin, /web/docs, /web/fabric-ui]
@@ -28,6 +36,10 @@ updates:
     directories: [/src/FeedFabric.Api, /src/FeedFabric.Worker.Events, /src/FeedFabric.Application]
     schedule:
       interval: weekly
+    ignore:
+      # The images follow the TargetFramework too: a newer major can't run a net10.0 app or its EF tool
+      - dependency-name: "dotnet/*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
