@@ -66,6 +66,7 @@ export interface Me {
   displayName: string | null
   moderator: boolean
   rankingAdmin: boolean
+  integrationAdmin: boolean
   environment: string
 }
 
@@ -167,7 +168,7 @@ export interface SystemInfo {
     issuer: string | null
     signingKeySet: boolean
     claims: { userId: string; username: string[]; displayName: string[]; avatar: string; roles: string[] }
-    roles: { moderator: string[]; rankingAdmin: string[] }
+    roles: { moderator: string[]; rankingAdmin: string[]; integrationAdmin: string[] }
     provisionUsers: boolean
   }
   moderation: {
@@ -188,7 +189,34 @@ export interface SystemInfo {
 
 export interface Tag {
   tag: string
-  source: 'hashtag' | 'inferred'
+  source: 'hashtag' | 'inferred' | 'app'
+}
+
+// A key the host's servers call the API with, through the SDKs; the key itself is only in CreatedApiKey
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  createdAt: string
+  createdBy: string | null
+  lastUsedAt: string | null
+  revokedAt: string | null
+  revokedBy: string | null
+}
+
+export interface CreatedApiKey extends ApiKey {
+  key: string
+}
+
+// A kind of structured data posts can carry, with the JSON Schema it's checked against
+export interface DataType {
+  key: string
+  label: string
+  description: string | null
+  version: number
+  schema: Record<string, unknown>
+  updatedAt: string
+  updatedBy: string | null
 }
 
 // A scanned, rebuilt image on a post; the URLs are short-lived

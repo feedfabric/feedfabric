@@ -1,0 +1,148 @@
+# Types for FeedFabric, for Steep or any RBS tool. Responses are the API's JSON as Hashes with string keys; the shapes
+# below are what's in them.
+module FeedFabric
+  VERSION: String
+
+  type report_reason = "spam" | "harassment" | "hate" | "threat" | "sexual" | "self_harm" | "other"
+  type json = nil | bool | Integer | Float | String | Array[json] | Hash[String, json]
+
+  # What the API sends: a JSON object
+  type object = Hash[String, untyped]
+
+  # {"type" => String, "value" => json}, from DataType#of
+  type post_data_input = Hash[String, untyped]
+
+  # Posts and pages, as Hashes. "post" keys: id, authorId, authorExternalUserId, authorUsername, content, createdAt,
+  # editedAt, repostOfId, repostOf, isHeld, tags ([{tag, source}]), media, data ({type, version, value}), ranking,
+  # likes, comments, reposts, liked, reposted
+  type post = object
+  type saved_post = object
+  type page = object
+  type media = object
+
+  class Error < StandardError
+    attr_reader status: Integer
+    attr_reader code: String
+    attr_reader params: Hash[String, untyped]
+    attr_reader errors: Array[untyped]
+    attr_reader trace_id: String?
+    attr_reader retry_after: Float?
+
+    def initialize: (Integer status, String code, String message, ?params: Hash[String, untyped], ?errors: Array[untyped],
+                     ?trace_id: String?, ?retry_after: Float?) -> void
+    def self.from_response: (Net::HTTPResponse response) -> Error
+  end
+
+  # One of your data types, typed: T is your own type, or the decoded JSON without parse and dump
+  #
+  #   WEIGHT = FeedFabric::DataType.new("weight-reading", parse: ..., dump: ...) #: FeedFabric::DataType[WeightReading]
+  class DataType[T]
+    attr_reader key: String
+
+    def initialize: (String key, ?parse: (^(untyped) -> T)?, ?dump: (^(T) -> json)?) -> void
+    def of: (T value) -> post_data_input
+    def is?: (object post) -> bool
+    def read: (object post) -> T?
+  end
+
+  class Client
+    NETWORK_ERRORS: Array[singleton(StandardError)]
+
+    attr_accessor upload_poll: Float
+
+    def initialize: (base_url: String, api_key: String, ?timeout: Numeric, ?max_retries: Integer) -> void
+    def as_member: (String external_user_id, ?username: String?, ?display_name: String?, ?avatar_url: String?) -> Member
+    def self.escape: (_ToS value) -> String
+    def request: (String method, String path, Hash[String, String] headers, ?query: Hash[Symbol, untyped], ?body: untyped) -> untyped
+    def put_file: (String url, String content, String content_type) -> void
+
+    private
+
+    def send_request: (String method, URI::Generic uri, Hash[String, String] headers, String? body) -> Net::HTTPResponse
+    def backoff: (Integer attempt) -> Float
+  end
+
+  class Member
+    attr_reader posts: Posts
+    attr_reader feeds: Feeds
+    attr_reader comments: Comments
+    attr_reader media: MediaUploads
+    attr_reader signals: Signals
+
+    def initialize: (Client client, Hash[String, String] headers) -> void
+    def call: (String method, String path, ?query: Hash[Symbol, untyped], ?body: untyped) -> untyped
+    def me: () -> { "externalUserId" => String }
+    def follow: (String external_user_id) -> nil
+    def unfollow: (String external_user_id) -> nil
+    def favourites: () -> Array[object]
+    def add_favourite: (String external_user_id) -> nil
+    def remove_favourite: (String external_user_id) -> nil
+    def data_types: () -> Array[object]
+    def data_type: (String key) -> object
+    def export_account: () -> object
+    def delete_account: () -> nil
+
+    private
+
+    def esc: (_ToS value) -> String
+  end
+
+  class Posts
+    def initialize: (Member member) -> void
+    def create: (?content: String?, ?tags: Array[String]?, ?media_ids: Array[String]?, ?data: post_data_input?) -> saved_post
+    def edit: (String post_id, ?content: String?, ?tags: Array[String]?, ?data: post_data_input?) -> saved_post
+    def delete: (String post_id) -> nil
+    def list: (?type: String?, ?order: ("newest" | "oldest")?, ?limit: Integer?, ?cursor: String?, ?gt: String?, ?gte: String?,
+               ?lt: String?, ?lte: String?) -> page
+    def like: (String post_id) -> nil
+    def unlike: (String post_id) -> nil
+    def repost: (String post_id) -> nil
+    def unrepost: (String post_id) -> nil
+    def report: (String post_id, report_reason reason) -> nil
+
+    private
+
+    def body: (String? content, Array[String]? tags, Array[String]? media_ids, post_data_input? data) -> Hash[Symbol, untyped]
+    def esc: (_ToS value) -> String
+  end
+
+  class Feeds
+    def initialize: (Member member) -> void
+    def home: (?limit: Integer?, ?cursor: String?) -> page
+    def for_you: (?profile: String?, ?limit: Integer?, ?cursor: String?) -> page
+    def favourites: (?limit: Integer?, ?cursor: String?) -> page
+    def tag: (String tag, ?limit: Integer?, ?cursor: String?) -> page
+    def trending_tags: (?hours: Integer?, ?limit: Integer?) -> Array[{ "tag" => String, "posts" => Integer }]
+    def mentions: (?limit: Integer?, ?cursor: String?) -> page
+  end
+
+  class Comments
+    def initialize: (Member member) -> void
+    def list: (String post_id, ?limit: Integer?, ?cursor: String?) -> page
+    def replies: (String comment_id, ?limit: Integer?, ?cursor: String?) -> page
+    def create: (String post_id, String content, ?parent_comment_id: String?) -> object
+    def delete: (String comment_id) -> nil
+    def report: (String comment_id, report_reason reason) -> nil
+
+    private
+
+    def esc: (_ToS value) -> String
+  end
+
+  class MediaUploads
+    def initialize: (Member member, Client client) -> void
+    def create_upload: (String content_type, Integer size) -> object
+    def complete: (String media_id) -> media
+    def get: (String media_id) -> media
+    def upload: (String content, String content_type, ?timeout: Numeric) -> media
+  end
+
+  class Signals
+    def initialize: (Member member) -> void
+    def impressions: (Array[String] post_ids) -> { "counted" => Integer }
+    def open: (String post_id) -> { "counted" => Integer }
+    def dwell: (Array[{ postId: String, ms: Integer }] views) -> { "counted" => Integer }
+    def not_interested: (String post_id) -> nil
+    def show_more: (String post_id) -> nil
+  end
+end

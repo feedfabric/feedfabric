@@ -4,7 +4,9 @@ import OverviewView from './views/OverviewView.vue'
 import PostView from './views/PostView.vue'
 import PostsView from './views/PostsView.vue'
 import ReportsView from './views/ReportsView.vue'
+import ApiKeysView from './views/ApiKeysView.vue'
 import ApiView from './views/ApiView.vue'
+import DataTypesView from './views/DataTypesView.vue'
 import ComposeView from './views/ComposeView.vue'
 import FeedView from './views/FeedView.vue'
 import ReviewView from './views/ReviewView.vue'
@@ -30,6 +32,8 @@ export const router = createRouter({
     { path: '/studio/:key?', name: 'studio', component: StudioView },
     // Someone's feeds as they see them: /feed shows yours
     { path: '/feed/:externalUserId?', name: 'feed', component: FeedView, props: true },
+    { path: '/api-keys', name: 'api-keys', component: ApiKeysView },
+    { path: '/data-types', name: 'data-types', component: DataTypesView },
     { path: '/system', name: 'system', component: SystemView },
     { path: '/api', name: 'api', component: ApiView },
     { path: '/:pathMatch(.*)*', redirect: '/overview' },

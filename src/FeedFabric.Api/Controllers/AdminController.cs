@@ -39,6 +39,7 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
             user?.DisplayName,
             Moderator = development || User.HasClaim(IdentityClaims.Role, ModerationPolicies.ReviewerRole),
             RankingAdmin = development || User.HasClaim(IdentityClaims.Role, RankingPolicies.AdminRole),
+            IntegrationAdmin = development || User.HasClaim(IdentityClaims.Role, AdminPolicies.IntegrationAdminRole),
             Environment = environment.EnvironmentName,
         };
     }
@@ -118,7 +119,7 @@ public class AdminController(IHostEnvironment environment) : ControllerBase
                     a.Claims.UserId, Username = a.Claims.UsernameOrDefault, DisplayName = a.Claims.DisplayNameOrDefault, a.Claims.Avatar,
                     Roles = a.Claims.RolesOrDefault,
                 },
-                Roles = new { Moderator = a.Roles.ModeratorOrDefault, RankingAdmin = a.Roles.RankingAdminOrDefault },
+                Roles = new { Moderator = a.Roles.ModeratorOrDefault, RankingAdmin = a.Roles.RankingAdminOrDefault, IntegrationAdmin = a.Roles.IntegrationAdminOrDefault },
                 a.ProvisionUsers,
             },
             Moderation = new

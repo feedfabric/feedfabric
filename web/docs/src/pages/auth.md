@@ -67,13 +67,14 @@ Usernames become lowercase letters, digits and underscores, up to 30 characters;
 |---|---|---|---|
 | Moderator | `Auth:Roles:Moderator` | `moderator` | `/admin/moderation`, `/admin/users`, `/admin/posts`, `/admin/media` |
 | Ranking admin | `Auth:Roles:RankingAdmin` | `ranking-admin` | Everything under `/ranking`: profiles, versions, preview, vocabulary |
-| Staff (either) | | | `/admin/dashboard`, `/admin/system`, `/admin/feed/{externalUserId}/…` |
+| Integration admin | `Auth:Roles:IntegrationAdmin` | `integration-admin` | [API keys](/sdks/) (`/admin/api-keys`) and [data types](/sdks/typed-data/) (`/admin/data-types`) |
+| Staff (any of these) | | | `/admin/dashboard`, `/admin/system`, `/admin/feed/{externalUserId}/…` |
 
 Members need no role. `GET /admin/me` works for anyone signed in and says what they can do:
 
 ```json
 { "externalUserId": "auth0|65f…", "username": "maya_runs", "displayName": "Maya", "moderator": false,
-  "rankingAdmin": false, "environment": "Production" }
+  "rankingAdmin": false, "integrationAdmin": false, "environment": "Production" }
 ```
 
 ## Development: X-Dev-User
@@ -86,8 +87,11 @@ Members need no role. `GET /admin/me` works for anyone signed in and says what t
 - with neither, you're user `1`.
 
 Users `1`, `2` and `3` (`dev1` to `dev3`) are seeded on startup, the simulator's are `sim-1` to `sim-1000`, and any
-other ID is created on its first request. **In Development every signed-in user passes the staff, moderator and
-ranking-admin policies**, and `GET /admin/me` says `true` for both roles.
+other ID is created on its first request. **In Development every signed-in user passes the staff, moderator,
+ranking-admin and integration-admin policies**, and `GET /admin/me` says `true` for every role. API keys never do.
+
+Your own servers sign in differently, with an API key and the member they act for: see
+[API keys and SDKs](/sdks/).
 
 ```ts
 // What the admin panel does (web/admin/src/api.ts): a token if it has one, X-Dev-User otherwise

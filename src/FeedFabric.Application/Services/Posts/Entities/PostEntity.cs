@@ -23,4 +23,12 @@ public class PostEntity : EntityBase
 
     // Held for review, or removed by a reviewer: see ContentStatus
     public ContentStatus Status {get;set;}
+
+    // Structured data from the host's app, checked against its data type (DataTypeEntity): the type's key, the
+    // version it was checked against, and the data as JSON
+    public string? DataType {get;set;}
+
+    public int? DataVersion {get;set;}
+
+    public string? Data {get;set;}
 }

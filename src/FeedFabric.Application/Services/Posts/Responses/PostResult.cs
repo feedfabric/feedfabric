@@ -1,3 +1,5 @@
+using FeedFabric.Application.Services.DataTypes;
+
 namespace FeedFabric.Application.Services.Posts;
 
 public enum PostResultStatus
@@ -16,9 +18,14 @@ public enum PostResultStatus
     MediaNotReady,
     // The text broke a community rule; PostResult.Violation says which
     ContentViolation,
+    // data.type isn't a registered data type
+    DataTypeUnknown,
+    DataTooLarge,
+    // The data doesn't match its type's schema; PostResult.DataErrors says how
+    DataInvalid,
 }
 
-public record PostResult(PostResultStatus Status, PostResponse? Post = null, string? Violation = null)
+public record PostResult(PostResultStatus Status, PostResponse? Post = null, string? Violation = null, IReadOnlyList<DataError>? DataErrors = null)
 {
     public static PostResult Ok(PostEntity post) => new(PostResultStatus.Ok, PostResponse.From(post));
 }

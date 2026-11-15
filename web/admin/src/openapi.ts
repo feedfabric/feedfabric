@@ -51,7 +51,7 @@ export interface Endpoint { method: Method; path: string; tag: string; operation
 // Tags are controller names; these read better as section titles
 const TagNames: Record<string, string> = {
   UserFeed: 'Feeds and posts', AdminModeration: 'Admin: moderation', AdminPosts: 'Admin: posts', AdminUsers: 'Admin: users',
-  AdminFeed: 'Admin: feeds', Admin: 'Admin', RankingProfiles: 'Ranking profiles', 'FeedFabric.Api': 'Other',
+  AdminFeed: 'Admin: feeds', AdminApiKeys: 'Admin: API keys', DataTypes: 'Data types', Admin: 'Admin', RankingProfiles: 'Ranking profiles', 'FeedFabric.Api': 'Other',
 }
 export const tagName = (tag: string) => TagNames[tag] ?? tag
 

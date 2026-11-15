@@ -45,6 +45,13 @@ export const nav: NavSection[] = [
     ],
   },
   {
+    title: 'Integrate',
+    links: [
+      { label: 'API keys and SDKs', href: '/sdks/' },
+      { label: 'Your own data on posts', href: '/sdks/typed-data/' },
+    ],
+  },
+  {
     title: 'Deploy',
     links: [
       { label: 'Deploying FeedFabric', href: '/deploy/' },

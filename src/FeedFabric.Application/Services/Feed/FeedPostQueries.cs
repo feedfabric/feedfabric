@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Safety;
 using FeedFabric.Application.Services.Tags;
@@ -99,9 +100,10 @@ public static class FeedPostQueries
             EditedAt = p.EditedAt,
             RepostOfId = p.RepostOfId,
             IsHeld = p.Status == ContentStatus.Held,
+            Data = p.DataType == null ? null : new PostDataResponse { Type = p.DataType, Version = p.DataVersion ?? 1, Value = p.Data ?? "{}" },
             Tags = db.PostTags.Where(t => t.PostId == p.Id)
                 .OrderBy(t => t.Source).ThenBy(t => t.Tag)
-                .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })
+                .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? TagSourceNames.Hashtag : t.Source == TagSource.App ? TagSourceNames.App : TagSourceNames.Inferred })
                 .ToList(),
         });
 }

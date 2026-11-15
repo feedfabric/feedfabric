@@ -3,7 +3,7 @@ import type {
   AdminPost, AdminPostDetail, AdminReport, AdminUser, AdminUserDetail, ContentState, Dashboard, Decision, ForYouFeed, LogEntry, Me,
   ModerationAction, ModerationOverview, Page, ProfileDetail, ProfileError, ProfileSummary, ProfileVersion, RankingProfile, RankingVocabulary,
   ReviewItem, SystemInfo, UserRef, UserStatus, Upload, MediaStatus, AdminMedia, CreatedPost, HomeFeed, CommentPage, FeedComment, Favourite,
-  ReportReason,
+  ReportReason, ApiKey, CreatedApiKey, DataType,
 } from './types'
 
 export class ApiError extends Error {
@@ -31,13 +31,13 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
     } catch {
       // Not a Problem Details body
     }
-    throw new ApiError(res.status, code, describe(res.status, code, `${method} ${path}`), params, errors)
+    throw new ApiError(res.status, code, describe(res.status, code, `${method} ${path}`, params), params, errors)
   }
   return (res.status === 204 ? undefined : await res.json()) as T
 }
 
 // What went wrong, for a person rather than a log
-function describe(status: number, code: string | undefined, what: string): string {
+function describe(status: number, code: string | undefined, what: string, params: Record<string, unknown> = {}): string {
   if (status === 401) return 'Not signed in. Paste a token from your identity provider, or run the API in Development.'
   if (status === 403) return "This account doesn't have the staff role this page needs."
   if (code === 'post.not_found' || code === 'comment.not_found') return 'It was deleted before you got to it.'
@@ -48,6 +48,8 @@ function describe(status: number, code: string | undefined, what: string): strin
   if (code === 'content.violation') return 'That breaks the community rules, so it was blocked.'
   if (code === 'post.edit_window_closed') return 'Posts can only be edited for 60 minutes after posting.'
   if (code === 'follow.self' || code === 'favourite.self') return "That's you."
+  if (code === 'data_type.invalid_key') return 'Keys use 2–40 lowercase letters, digits and dashes, starting with a letter.'
+  if (code === 'data_type.invalid_schema') return `That schema can't be used: ${String(params.reason ?? 'it isn’t valid')}`
   if (code === 'favourite.limit_reached') return 'Already at 30 favourites. Remove one to add another.'
   return `${what} failed: ${status}${code ? ` ${code}` : ''}`
 }
@@ -159,6 +161,15 @@ export const api = {
   notInterested: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/not-interested`, 'POST'),
   showMore: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/show-more`, 'POST'),
   opened: (postId: string) => request<void>(`/userfeed/posts/${id(postId)}/open`, 'POST'),
+
+  // Integrations: API keys for the host's servers, and the data types posts can carry
+  apiKeys: () => request<ApiKey[]>('/admin/api-keys'),
+  createApiKey: (name: string) => request<CreatedApiKey>('/admin/api-keys', 'POST', { name }),
+  revokeApiKey: (keyId: string) => request<void>(`/admin/api-keys/${id(keyId)}`, 'DELETE'),
+  dataTypes: () => request<DataType[]>('/data-types'),
+  saveDataType: (key: string, type: { label: string; description: string | null; schema: unknown }) =>
+    request<DataType>(`/admin/data-types/${id(key)}`, 'PUT', type),
+  deleteDataType: (key: string) => request<void>(`/admin/data-types/${id(key)}`, 'DELETE'),
 }
 
 // PUTs a file to an upload URL, reporting progress (fetch can't report upload progress yet)

@@ -100,6 +100,7 @@ OpenID Connect server.
 | `Auth:Claims:Roles` | `roles`, `role`, `permissions` | |
 | `Auth:Roles:Moderator` | `moderator` | Your role names that count as moderators |
 | `Auth:Roles:RankingAdmin` | `ranking-admin` | Your role names that can save ranking profiles and topics |
+| `Auth:Roles:IntegrationAdmin` | `integration-admin` | Your role names that can manage API keys and data types |
 | `Auth:ProvisionUsers` | `true` | Create users on their first request |
 | `Auth:ProfileRefresh` | `01:00:00` | How long a profile from a token is trusted before it's refreshed |
 

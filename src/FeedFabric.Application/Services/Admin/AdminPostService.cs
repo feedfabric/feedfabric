@@ -52,7 +52,7 @@ public class AdminPostService(AppDbContext db, IMediaService media)
 
         var tags = await db.PostTags.AsNoTracking().Where(t => t.PostId == postId)
             .OrderBy(t => t.Source).ThenBy(t => t.Tag)
-            .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? "hashtag" : "inferred" })
+            .Select(t => new TagResponse { Tag = t.Tag, Source = t.Source == TagSource.Hashtag ? TagSourceNames.Hashtag : t.Source == TagSource.App ? TagSourceNames.App : TagSourceNames.Inferred })
             .ToListAsync(cancellationToken);
         var images = await media.ForPostsAsync([postId], cancellationToken);
         var comments = await CommentRows(db, db.Comments.Where(c => c.PostId == postId).OrderBy(c => c.Id)).ToListAsync(cancellationToken);

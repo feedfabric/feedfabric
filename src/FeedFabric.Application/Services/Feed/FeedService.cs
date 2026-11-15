@@ -18,6 +18,10 @@ public class FeedService(AppDbContext db) : IFeedService
             .Where(p => p.AuthorId == userId.Value)
             .Live(db, userId);
 
+        if (!string.IsNullOrEmpty(query.Type))
+        {
+            posts = posts.Where(p => p.DataType == query.Type);
+        }
         if (query.Gt is { } gt)
         {
             posts = posts.Where(p => p.Id > gt);

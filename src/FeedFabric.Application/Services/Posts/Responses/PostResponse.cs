@@ -1,3 +1,4 @@
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Safety;
 
 namespace FeedFabric.Application.Services.Posts;
@@ -20,6 +21,9 @@ public class PostResponse
     // Held for review: saved, but only the author sees it until a reviewer decides
     public bool IsHeld {get;set;}
 
+    // Structured data from the host's app; null on most posts
+    public PostDataResponse? Data {get;set;}
+
     public static PostResponse From(PostEntity post) => new()
     {
         Id = post.Id,
@@ -29,5 +33,6 @@ public class PostResponse
         EditedAt = post.EditedAt,
         RepostOfId = post.RepostOfId,
         IsHeld = post.Status == ContentStatus.Held,
+        Data = post.DataType is null ? null : new PostDataResponse { Type = post.DataType, Version = post.DataVersion ?? 1, Value = post.Data ?? "{}" },
     };
 }

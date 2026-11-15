@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Mentions;
 using FeedFabric.Application.Services.Messaging;
@@ -9,7 +10,8 @@ using FeedFabric.Application.Services.Users;
 
 namespace FeedFabric.Application.Services.Posts;
 
-public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<MediaOptions> mediaOptions, TextModerator moderator, TopicRules topics)
+public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<MediaOptions> mediaOptions, TextModerator moderator, TopicRules topics,
+    DataTypeStore dataTypes)
     : IPostService
 {
     public static readonly TimeSpan EditWindow = TimeSpan.FromHours(1);
@@ -22,7 +24,8 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(PostResultStatus.UserNotFound);
         }
 
-        var verdict = await moderator.CheckAsync(request.Content, cancellationToken);
+        // A post that's only data has no words to check
+        var verdict = string.IsNullOrWhiteSpace(request.Content) ? null : await moderator.CheckAsync(request.Content, cancellationToken);
         if (verdict is { Action: ModerationAction.Block })
         {
             await RecordAsync(authorId.Value, verdict, request.Content, null, cancellationToken);
@@ -36,12 +39,21 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(mediaStatus);
         }
 
+        var data = request.Data is { } requested ? await dataTypes.CheckAsync(requested.Type, requested.Value, cancellationToken) : null;
+        if (DataProblem(data) is { } dataProblem)
+        {
+            return dataProblem;
+        }
+
         var post = new PostEntity
         {
             AuthorId = authorId.Value,
             Content = request.Content,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             Status = verdict is { Action: ModerationAction.Hold } ? ContentStatus.Held : ContentStatus.Visible,
+            DataType = request.Data?.Type,
+            DataVersion = data?.Version,
+            Data = data?.Json,
         };
         db.Posts.Add(post);
         if (verdict is not null)
@@ -56,7 +68,8 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             AuthorId = post.AuthorId,
             CreatedAt = post.CreatedAt,
         }, post.CreatedAt);
-        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher));
+        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher,
+            request.Tags));
         db.PostMedia.AddRange(mediaIds.Select((id, i) => new PostMediaEntity { PostId = post.Id, MediaId = id, Position = i }));
         await db.AddMentionsAsync(post.AuthorId, post.Id, null, post.Content, post.CreatedAt, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -83,11 +96,24 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             return new PostResult(PostResultStatus.EditWindowClosed);
         }
 
-        var verdict = await moderator.CheckAsync(request.Content, cancellationToken);
+        // A post that's only data has no words to check
+        var verdict = string.IsNullOrWhiteSpace(request.Content) ? null : await moderator.CheckAsync(request.Content, cancellationToken);
         if (verdict is { Action: ModerationAction.Block })
         {
             await RecordAsync(post.AuthorId, verdict, request.Content, post.Id, cancellationToken);
             return new PostResult(PostResultStatus.ContentViolation, Violation: verdict.Category);
+        }
+
+        var data = request.Data is { } requested ? await dataTypes.CheckAsync(requested.Type, requested.Value, cancellationToken) : null;
+        if (DataProblem(data) is { } dataProblem)
+        {
+            return dataProblem;
+        }
+        if (data is not null)
+        {
+            post.DataType = request.Data!.Type;
+            post.DataVersion = data.Version;
+            post.Data = data.Json;
         }
 
         post.Content = request.Content;
@@ -103,9 +129,12 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
             db.ModerationEvents.Add(ModerationEventEntity.For(post.AuthorId, "post", verdict, post.Content, post.Id, null, now));
         }
 
-        // New text, new tags. Mentions that were removed go; new ones are added and announced.
-        db.PostTags.RemoveRange(await db.PostTags.Where(t => t.PostId == post.Id).ToListAsync(cancellationToken));
-        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher));
+        // New text, new tags; the app's tags stay unless the edit sets new ones. Mentions that were removed go; new ones
+        // are added and announced.
+        var oldTags = await db.PostTags.Where(t => t.PostId == post.Id).ToListAsync(cancellationToken);
+        var appTags = request.Tags ?? [.. oldTags.Where(t => t.Source == TagSource.App).Select(t => t.Tag)];
+        db.PostTags.RemoveRange(oldTags);
+        db.PostTags.AddRange(TextTokens.TagsFor(post.Id, post.Content, post.CreatedAt, (await topics.CurrentAsync(cancellationToken)).Matcher, appTags));
         var usernames = TextTokens.Mentions(post.Content);
         db.Mentions.RemoveRange(await db.Mentions
             .Where(m => m.PostId == post.Id && m.CommentId == null
@@ -136,6 +165,14 @@ public class PostService(AppDbContext db, TimeProvider timeProvider, IOptions<Me
 
         return PostResult.Ok(post);
     }
+
+    private static PostResult? DataProblem(DataCheckResult? data) => data?.Status switch
+    {
+        null or DataCheckStatus.Ok => null,
+        DataCheckStatus.UnknownType => new PostResult(PostResultStatus.DataTypeUnknown),
+        DataCheckStatus.TooLarge => new PostResult(PostResultStatus.DataTooLarge),
+        _ => new PostResult(PostResultStatus.DataInvalid, DataErrors: data.Errors),
+    };
 
     // A block is recorded on its own, since nothing else is saved
     private async Task RecordAsync(Guid userId, ModerationVerdict verdict, string text, Guid? postId, CancellationToken cancellationToken)

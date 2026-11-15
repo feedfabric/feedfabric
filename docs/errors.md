@@ -47,6 +47,14 @@ Every error response is [RFC 9457 Problem Details](https://www.rfc-editor.org/rf
 | `follow.self` | 400 | | Users can't follow themselves |
 | `favourite.self` | 400 | | Users can't make themselves a favourite |
 | `favourite.limit_reached` | 409 | `max` | Already at the most favourites allowed (30); remove one to add another |
+| `post.data_type_unknown` | 400 | `type` | The post's `data.type` isn't a registered data type (`GET /data-types`) |
+| `post.data_too_large` | 400 | `maxBytes` | The post's `data.value` is over 16 KB of JSON |
+| `post.data_invalid` | 400 | `type` | The post's `data.value` doesn't match its type's schema; `errors` lists each `{ path, message }`, with `path` a JSON Pointer into the value |
+| `data_type.not_found` | 404 | `type` | No data type with that key |
+| `data_type.invalid_key` | 400 | `type` | Keys are 2–40 lowercase letters, digits and dashes, starting with a letter |
+| `data_type.invalid_schema` | 400 | `reason` | Not a JSON Schema a post's data can use: it must have `"type": "object"` at its root and be at most 32 KB. `reason` says what's wrong |
+| `api_key.not_found` | 404 | | No API key with that ID |
+| `api_key.user_required` | 401 | | An API key was sent without `FeedFabric-User`: say which member the call is for |
 | `bad_request` | 400 | | Generic fallback |
 | `unauthorized` | 401 | | Missing or invalid token |
 | `forbidden` | 403 | | Generic fallback |

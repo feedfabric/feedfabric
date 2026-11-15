@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Posts;
@@ -53,7 +54,7 @@ public class Backfill(
                 using var scope = scopes.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var feedLog = new FeedLog(db, redis, clock);
-                var posts = new PostService(db, clock, mediaOptions, moderator, topics);
+                var posts = new PostService(db, clock, mediaOptions, moderator, topics, scope.ServiceProvider.GetRequiredService<DataTypeStore>());
                 var commentService = new CommentService(db, feedLog, moderator, clock);
                 var likeService = new LikeService(db, feedLog, clock);
 

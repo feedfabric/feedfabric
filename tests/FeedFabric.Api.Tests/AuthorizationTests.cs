@@ -77,7 +77,7 @@ public class AuthorizationTests(ApiFactory api)
     public void Every_staff_route_has_a_staff_policy()
     {
         var endpoints = api.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>();
-        var staffPolicies = new[] { ModerationPolicies.Reviewer, RankingPolicies.Admin, AdminPolicies.Staff };
+        var staffPolicies = new[] { ModerationPolicies.Reviewer, RankingPolicies.Admin, AdminPolicies.Staff, AdminPolicies.IntegrationAdmin };
         var staffRoutes = endpoints
             .Where(e => e.RoutePattern.RawText?.TrimStart('/') is { } route && (route.StartsWith("admin") || route.StartsWith("ranking")))
             .ToList();

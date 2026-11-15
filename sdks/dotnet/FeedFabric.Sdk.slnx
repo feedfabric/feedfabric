@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/FeedFabric.Sdk/FeedFabric.Sdk.csproj" />
+  <Project Path="tests/FeedFabric.Sdk.Tests/FeedFabric.Sdk.Tests.csproj" />
+</Solution>

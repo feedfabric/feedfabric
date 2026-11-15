@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.ApiKeys;
 using FeedFabric.Application.Services.Comments;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Favourites;
 using FeedFabric.Application.Services.Follows;
 using FeedFabric.Application.Services.Likes;
@@ -48,6 +50,10 @@ public class AppDbContext : DbContext
     public DbSet<RankingProfileEntity> RankingProfiles => Set<RankingProfileEntity>();
 
     public DbSet<TopicSetEntity> TopicSets => Set<TopicSetEntity>();
+
+    public DbSet<ApiKeyEntity> ApiKeys => Set<ApiKeyEntity>();
+
+    public DbSet<DataTypeEntity> DataTypes => Set<DataTypeEntity>();
 
     public DbSet<OutboxMessageEntity> OutboxMessages => Set<OutboxMessageEntity>();
 
@@ -305,6 +311,28 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<RankingProfileEntity>().Property(p => p.SavedBy).HasMaxLength(64);
 
         // One row per saved version of the topics; the latest is the live one
+        modelBuilder.Entity<DataTypeEntity>().HasIndex(t => t.Key).IsUnique();
+        modelBuilder.Entity<DataTypeEntity>().Property(t => t.Key).HasMaxLength(DataTypeStore.MaxKeyLength);
+        modelBuilder.Entity<DataTypeEntity>().Property(t => t.Label).HasMaxLength(DataTypeStore.MaxLabelLength);
+        modelBuilder.Entity<DataTypeEntity>().Property(t => t.Description).HasMaxLength(DataTypeStore.MaxDescriptionLength);
+        modelBuilder.Entity<DataTypeEntity>().Property(t => t.Schema).HasColumnType("jsonb");
+        modelBuilder.Entity<DataTypeEntity>().Property(t => t.UpdatedBy).HasMaxLength(64);
+
+        modelBuilder.Entity<PostEntity>().Property(p => p.DataType).HasMaxLength(DataTypeStore.MaxKeyLength);
+        modelBuilder.Entity<PostEntity>().Property(p => p.Data).HasColumnType("jsonb");
+        // Serves "this member's posts of one data type" (GET /userfeed?type=), and only covers posts that have one
+        modelBuilder.Entity<PostEntity>()
+            .HasIndex(p => new { p.AuthorId, p.DataType, p.Id })
+            .HasFilter("\"DataType\" IS NOT NULL");
+
+        // Keys are looked up by hash on every request they're used for
+        modelBuilder.Entity<ApiKeyEntity>().HasIndex(k => k.Hash).IsUnique();
+        modelBuilder.Entity<ApiKeyEntity>().Property(k => k.Hash).HasMaxLength(64);
+        modelBuilder.Entity<ApiKeyEntity>().Property(k => k.Name).HasMaxLength(ApiKeyStore.MaxNameLength);
+        modelBuilder.Entity<ApiKeyEntity>().Property(k => k.Prefix).HasMaxLength(ApiKeyStore.PrefixLength);
+        modelBuilder.Entity<ApiKeyEntity>().Property(k => k.CreatedBy).HasMaxLength(64);
+        modelBuilder.Entity<ApiKeyEntity>().Property(k => k.RevokedBy).HasMaxLength(64);
+
         modelBuilder.Entity<TopicSetEntity>().HasIndex(t => t.Version).IsUnique();
         modelBuilder.Entity<TopicSetEntity>().Property(t => t.Topics).HasColumnType("jsonb");
         modelBuilder.Entity<TopicSetEntity>().Property(t => t.Library).HasMaxLength(TopicStore.MaxLibraryLength);

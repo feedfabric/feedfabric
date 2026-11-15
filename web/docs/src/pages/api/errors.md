@@ -51,6 +51,14 @@ in `src/FeedFabric.Application/Errors/ErrorCodes.cs`; the repository's `docs/err
 | `follow.self` | 400 | | Can't follow yourself | `/follows/{id}` |
 | `favourite.self` | 400 | | Can't favourite yourself | `/favourites/{id}` |
 | `favourite.limit_reached` | 409 | `max` | Already at 30 favourites | `PUT /favourites/{id}` |
+| `post.data_type_unknown` | 400 | `type` | `data.type` isn't a registered [data type](/sdks/typed-data/) | `POST`, `PUT /userfeed/posts` |
+| `post.data_too_large` | 400 | `maxBytes` | `data.value` is over 16 KB of JSON | `POST`, `PUT /userfeed/posts` |
+| `post.data_invalid` | 400 | `type` | `data.value` doesn't match the type's schema; `errors` lists each `{ path, message }` | `POST`, `PUT /userfeed/posts` |
+| `data_type.not_found` | 404 | `type` | No data type with that key | `GET /data-types/{key}`, `DELETE /admin/data-types/{key}` |
+| `data_type.invalid_key` | 400 | `type` | Keys are 2–40 lowercase letters, digits and dashes, starting with a letter | `PUT /admin/data-types/{key}` |
+| `data_type.invalid_schema` | 400 | `reason` | Not an object schema, over 32 KB, or not valid JSON Schema | `PUT /admin/data-types/{key}` |
+| `api_key.not_found` | 404 | | No API key with that ID | `DELETE /admin/api-keys/{id}` |
+| `api_key.user_required` | 401 | | An [API key](/sdks/) without `FeedFabric-User` | Any route |
 | `profile.not_found` | 404 | `profile` | No ranking profile with that key | `/userfeed/foryou?profile=`, `/ranking/profiles/*` |
 | `profile.read_only` | 409 | `profile` | Presets can't be changed or deleted | `PUT`/`DELETE /ranking/profiles/{key}` |
 | `profile.invalid` | 400 | | Settings out of range, or a formula that doesn't parse; `errors` lists `{ field, message, position? }` | `PUT /ranking/profiles/{key}`, `/ranking/preview` |

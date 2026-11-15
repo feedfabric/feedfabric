@@ -10,7 +10,9 @@ description: Every route the API serves, grouped by what it's for, with the para
   `/follows`, `/favourites` and `/media`; staff routes under `/admin` and `/ranking`.
 - **Auth**: every route needs `Authorization: Bearer <token>` (in Development, or `X-Dev-User: <id>`). Without one:
   `401 unauthorized`. Routes marked *moderator*, *ranking admin* or *staff* also need that role outside Development:
-  `403 forbidden` without it. See [Sign-in and users](/auth/).
+  `403 forbidden` without it. See [Sign-in and users](/auth/). Your own servers can instead send an
+  [API key](/sdks/) (`Bearer ffk_…`) with `FeedFabric-User: <externalUserId>` to act for a member; keys reach every
+  member route and no staff one.
 - **JSON** in and out, camelCase, `Content-Type: application/json` on bodies (`415 unsupported_media_type`
   otherwise). IDs are UUID strings; times are ISO 8601 UTC.
 - **Paging**: `limit` (1–100, default 20) and `cursor`, the previous page's `nextCursor`; `null` means the end.
@@ -38,7 +40,7 @@ error codes it returns.
 | <span class="m">GET</span> | `/userfeed/tags/trending` | Tags on the most recent posts, hashtags and inferred topics alike: `[{ tag, posts }]` | `hours` (1–168, 24), `limit` (1–50, 10) | |
 | <span class="m">GET</span> | `/userfeed/tags/{tag}/posts` | Posts with a tag, newest first | `limit`, `cursor` | |
 | <span class="m">GET</span> | `/userfeed/mentions` | Posts and comments that @mention you, newest first: `{ mentions, nextCursor }` | `limit`, `cursor` | |
-| <span class="m">GET</span> | `/userfeed` | Your own posts, in the bare post shape | `limit`, `cursor`, `order` (`newest`/`oldest`), `gt`, `gte`, `lt`, `lte` (post IDs) | |
+| <span class="m">GET</span> | `/userfeed` | Your own posts, in the bare post shape | `limit`, `cursor`, `order` (`newest`/`oldest`), `gt`, `gte`, `lt`, `lte` (post IDs), `type` (only posts with [data](/sdks/typed-data/) of that type) | |
 
 Feed responses are `{ posts, nextCursor, source }` (Following, favourites, tags) or
 `{ posts, nextCursor, ranker, profile, candidates }` (For You). Each post has `likes`, `comments` and `reposts`, and
@@ -49,11 +51,16 @@ Feed responses are `{ posts, nextCursor, source }` (Following, favourites, tags)
 
 | | Route | Purpose | Body | Success | Errors |
 |---|---|---|---|---|---|
-| <span class="m post">POST</span> | `/userfeed/posts` | Create a post | `{ content, mediaIds? }` | `201` post | `422 content.violation`, `400 post.too_many_media`, `404 media.not_found`, `409 media.not_ready` |
-| <span class="m put">PUT</span> | `/userfeed/posts/{id}` | Edit the text, within 60 minutes | `{ content }` | `200` post | `404 post.not_found`, `403 post.not_author`, `409 post.edit_window_closed`, `409 post.is_repost`, `422 content.violation` |
+| <span class="m post">POST</span> | `/userfeed/posts` | Create a post | `{ content?, tags?, mediaIds?, data? }` | `201` post | `422 content.violation`, `400 post.too_many_media`, `404 media.not_found`, `409 media.not_ready`, `400 post.data_type_unknown`, `400 post.data_too_large`, `400 post.data_invalid` |
+| <span class="m put">PUT</span> | `/userfeed/posts/{id}` | Edit, within 60 minutes | `{ content?, tags?, data? }` | `200` post | `404 post.not_found`, `403 post.not_author`, `409 post.edit_window_closed`, `409 post.is_repost`, `422 content.violation`, and the three `post.data_*` |
 | <span class="m delete">DELETE</span> | `/userfeed/posts/{id}` | Delete your post | | `204` | `404 post.not_found`, `403 post.not_author` |
 
-The post is `{ id, authorId, content, createdAt, editedAt, repostOfId, isHeld }`. There's no route to fetch one post.
+The post is `{ id, authorId, content, createdAt, editedAt, repostOfId, isHeld, data }`. There's no route to fetch one post.
+
+`content` is required unless the post has `data`. `tags` are your app's own (up to 10, written like hashtags without
+the `#`) and show on the post with source `app`. `data` is `{ type, value }` of a registered data type, checked
+against its schema, and comes back as `{ type, version, value }` on the post in every feed. On an edit, leaving out
+`tags` or `data` keeps the post's. See [Your own data on posts](/sdks/typed-data/).
 
 ## Engagement
 
@@ -160,11 +167,31 @@ New and edited posts use a saved set within a minute; posts already tagged keep 
 | <span class="m">GET</span> | `/admin/posts/{id}` | A post with its comments, reports and moderation history | `404 post.not_found` |
 | <span class="m">GET</span> | `/admin/media/{id}` | An upload with its nudity score and the line it's judged against | `404 media.not_found` |
 
-## Staff <small>(moderator or ranking admin)</small>
+## Data types
+
+| | Route | Purpose | Errors |
+|---|---|---|---|
+| <span class="m">GET</span> | `/data-types` | The registered types: `[{ key, label, description, version, schema, updatedAt, updatedBy }]` | |
+| <span class="m">GET</span> | `/data-types/{key}` | One type | `404 data_type.not_found` |
+| <span class="m">GET</span> | `/data-types/{key}/schema` | Its JSON Schema alone (`application/schema+json`), for code generators | `404 data_type.not_found` |
+
+## Integrations <small>(integration admin)</small>
+
+| | Route | Purpose | Body | Errors |
+|---|---|---|---|---|
+| <span class="m">GET</span> | `/admin/api-keys` | Every key, newest first, revoked ones too: `[{ id, name, prefix, createdAt, createdBy, lastUsedAt, revokedAt, revokedBy }]` | | |
+| <span class="m post">POST</span> | `/admin/api-keys` | Make a key: `201` with the same fields plus `key`, shown only this once | `{ name }` | |
+| <span class="m delete">DELETE</span> | `/admin/api-keys/{id}` | Revoke a key: at once here, within a minute on other servers | | `404 api_key.not_found` |
+| <span class="m put">PUT</span> | `/admin/data-types/{key}` | Add or change a data type. The version goes up only when the schema changes | `{ label, description?, schema }` | `400 data_type.invalid_key`, `400 data_type.invalid_schema` |
+| <span class="m delete">DELETE</span> | `/admin/data-types/{key}` | Remove a data type; posts keep their data | | `404 data_type.not_found` |
+
+API keys can't use these, or any other staff route.
+
+## Staff <small>(moderator, ranking admin or integration admin)</small>
 
 | | Route | Purpose |
 |---|---|---|
-| <span class="m">GET</span> | `/admin/me` | Any signed-in user: who they are and which roles they have (`moderator`, `rankingAdmin`, `environment`) |
+| <span class="m">GET</span> | `/admin/me` | Any signed-in user: who they are and which roles they have (`moderator`, `rankingAdmin`, `integrationAdmin`, `environment`) |
 | <span class="m">GET</span> | `/admin/dashboard?minutes=60` | Everything the admin panel's overview shows, in one call |
 | <span class="m">GET</span> | `/admin/system` | Sign-in settings (no secrets), moderation thresholds, media limits, models, ranker, users by status, outbox and consumers |
 | <span class="m">GET</span> | `/admin/feed/{externalUserId}/following` | A member's Following as they'd see it, without logging it |

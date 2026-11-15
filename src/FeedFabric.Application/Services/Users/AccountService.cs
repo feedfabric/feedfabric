@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using FeedFabric.Application.Services.DataTypes;
 using FeedFabric.Application.Services.Likes;
 using FeedFabric.Application.Services.Media;
 using FeedFabric.Application.Services.Messaging;
@@ -35,6 +36,7 @@ public class AccountService(AppDbContext db, IConnectionMultiplexer redis, IBlob
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.Posts.Where(p => p.AuthorId == user.Id).ExecuteUpdateAsync(s => s
             .SetProperty(p => p.Content, "")
+            .SetProperty(p => p.Data, (string?)null)
             .SetProperty(p => p.DeletedAt, p => p.DeletedAt ?? now), cancellationToken);
         // Comments stay as "deleted" placeholders, as when their author deletes one, so replies to them still read
         await db.Comments.Where(c => c.AuthorId == user.Id).ExecuteUpdateAsync(s => s
@@ -70,7 +72,8 @@ public class AccountService(AppDbContext db, IConnectionMultiplexer redis, IBlob
 
         var posts = await db.Posts.AsNoTracking().Where(p => p.AuthorId == id).OrderBy(p => p.Id)
             .Select(p => new ExportedPost(p.Id, p.Content, p.CreatedAt, p.EditedAt, p.DeletedAt, p.RepostOfId, p.Status.ToString(),
-                db.PostTags.Where(t => t.PostId == p.Id).Select(t => t.Tag).ToList()))
+                db.PostTags.Where(t => t.PostId == p.Id).Select(t => t.Tag).ToList(),
+                p.DataType == null ? null : new PostDataResponse { Type = p.DataType, Version = p.DataVersion ?? 1, Value = p.Data ?? "{}" }))
             .ToListAsync(cancellationToken);
         var comments = await db.Comments.AsNoTracking().Where(c => c.AuthorId == id).OrderBy(c => c.Id)
             .Select(c => new ExportedComment(c.Id, c.PostId, c.ParentCommentId, c.Content, c.CreatedAt, c.DeletedAt, c.Status.ToString()))
@@ -159,7 +162,7 @@ public record ExportedUser(string ExternalUserId, string Username, string? Displ
     DateTime? CreatedAt, DateTime SyncedAt);
 
 public record ExportedPost(Guid Id, string Content, DateTime CreatedAt, DateTime? EditedAt, DateTime? DeletedAt, Guid? RepostOf,
-    string Status, List<string> Tags);
+    string Status, List<string> Tags, PostDataResponse? Data);
 
 public record ExportedComment(Guid Id, Guid PostId, Guid? ParentCommentId, string Content, DateTime CreatedAt, DateTime? DeletedAt,
     string Status);
