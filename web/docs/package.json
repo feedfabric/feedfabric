@@ -11,7 +11,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "astro": "7.4.7"
+    "astro": "7.4.11"
   },
   "devDependencies": {
     "pagefind": "1.6.0",
